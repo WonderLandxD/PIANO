@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+include-package-data = true
+
+[project]
+name = "piano"
+version = "1.0.0"
+description = "PINAO: an easy-to-use PyTorch library for pathology image analysis models"
+readme = "README.md"
+requires-python = ">=3.9"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: MIT",
+]
+dependencies = [
+    'transformers', 'timm'
+]
+
+[tool.setuptools.packages.find]
+exclude = ["assets*", "benchmark*", "docs", "dist*", "scripts*", "tests*", "checkpoints*"]
+
+[tool.wheel]
+exclude = ["assets*", "benchmark*", "docs", "dist*", "scripts*", "tests*", "checkpoints*"]
