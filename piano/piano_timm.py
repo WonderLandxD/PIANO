@@ -275,7 +275,8 @@ class MuskModel(BaseModel):
     def __init__(self, checkpoint_path, device='cpu'):
         super().__init__()
         from musk import utils
-        model = timm.create_model("musk_large_patch16_384")
+        from timm.models import create_model
+        model = create_model("musk_large_patch16_384")
         utils.load_model_and_may_interpolate(checkpoint_path, model, 'model|module', '')
         self.model = model.to(device)
         self.preprocess = transforms.Compose([
