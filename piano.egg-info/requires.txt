@@ -1,0 +1,5 @@
+transformers
+timm
+einops
+sentencepiece
+fairscale
