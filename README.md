@@ -55,6 +55,15 @@ We use [PLIP](https://www.nature.com/articles/s41591-023-02504-3) as an example.
 •	device='cuda:0': Choose the device to run the model (e.g., cuda, cuda:0, cuda:1, or CPU).
 
 ```
+# Set the Hugging Face endpoint to the mirror if you have trobule downloading the model
+os.environ['HF_ENDPOINT'] = 'https://hf-mirror.com'
+
+# Login to Hugging Face
+from huggingface_hub import login
+login(<huggingface write token>)
+```
+
+```
 # Load the PLIP model and preprocessing functions
 
 model, image_preprocess, text_preprocess = piano.create_piano(
@@ -112,12 +121,16 @@ with torch.inference_mode():
 |--------------------------|------------------------------------|-----------------------------------------------------------------------------------|
 | `plip`                   | `vinid/plip`                       | [Hugging Face - vinid/plip](https://huggingface.co/vinid/plip)                    |
 | `openai_clip_p16`        | `openai/clip-vit-base-patch16`     | [Hugging Face - openai/clip-vit-base-patch16](https://huggingface.co/openai/clip-vit-base-patch16) |
-| `conch_v1_0`             | `local_dir`                        | [Hugging Face - MahmoodLab/CONCH](https://huggingface.co/MahmoodLab/CONCH) |
-| `uni-1`                  | `local_dir`                        | [Hugging Face - MahmoodLab/UNI](https://huggingface.co/MahmoodLab/UNI) |
-| `uni-2`                  | `local_dir`                        | [Hugging Face - MahmoodLab/UNI2-h](https://huggingface.co/MahmoodLab/UNI2-h) |
-| `prov_gigapath_patch`    | `local_dir`                        | [Hugging Face - prov-gigapath/prov-gigapath](https://huggingface.co/prov-gigapath/prov-gigapath) |
+| `conch_v1`               | `local_dir`                        | [Hugging Face - MahmoodLab/CONCH](https://huggingface.co/MahmoodLab/CONCH) |
+| `uni_v1`                  | `hf-hub:MahmoodLab/uni`                        | [Hugging Face - MahmoodLab/UNI](https://huggingface.co/MahmoodLab/UNI) |
+| `uni_v2`                  | `hf-hub:MahmoodLab/UNI2-h`                        | [Hugging Face - MahmoodLab/UNI2-h](https://huggingface.co/MahmoodLab/UNI2-h) |
+| `prov_gigapath_tile`      | `hf_hub:prov-gigapath/prov-gigapath` | [Hugging Face - prov-gigapath/prov-gigapath](https://huggingface.co/prov-gigapath/prov-gigapath) |
+| `virchow_v1`              | `hf_hub:paige-ai/Virchow`            | [Hugging Face - paige-ai/Virchow](https://huggingface.co/paige-ai/Virchow) |
+| `virchow_v2`              | `hf_hub:paige-ai/Virchow2`           | [Hugging Face - paige-ai/Virchow2](https://huggingface.co/paige-ai/Virchow2) |
+| `musk`                     | `hf_hub:xiangjx/musk`                | [Hugging Face - xiangjx/musk](https://huggingface.co/xiangjx/musk) |
+| `h_optimus_0`              | `hf_hub:bioptimus/H-optimus-0`        | [Hugging Face - bioptimus/H-optimus-0](https://huggingface.co/bioptimus/H-optimus-0) |
 
-**Note**: `local_dir` means the path to your local model files downloaded from the official source. More models will be supported soon (start at 01-30-2025).
+**Note**: `local_dir` means the path to your local model files downloaded from the official source. More models will be supported (Updated on 01-31-2025).
 
 ### 🌞 *3. Using pathology foundation models to create patch features.*
 

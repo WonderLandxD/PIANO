@@ -1,30 +1,39 @@
 import warnings
 warnings.filterwarnings("ignore", category=FutureWarning, message=".*weights_only=False.*")
 
+import importlib.util
 import os
-os.environ['HF_ENDPOINT'] = 'https://hf-mirror.com'
+
 
 import torch
 import torch.nn.functional as F
 from torchvision import transforms
 
 import timm
+from timm.data import resolve_data_config
+from timm.data.transforms_factory import create_transform
+from timm.layers import SwiGLUPacked
 from transformers import CLIPProcessor, CLIPModel
+from transformers import XLMRobertaTokenizer
 
 
 MODEL_HF_PATHS = {
     "plip": "vinid/plip",  
     "openai_clip_p16": "openai/clip-vit-base-patch16",  
-    "conch_v1_0": "local_dir",
-    "uni-1": "local_dir",
-    "uni-2": "local_dir",
-    "prov_gigapath_patch": "local_dir",
+    "conch_v1": "local_dir",
+    "uni_v1": "hf-hub:MahmoodLab/uni",
+    "uni_v2": "hf-hub:MahmoodLab/UNI2-h",
+    "prov_gigapath_tile": "hf_hub:prov-gigapath/prov-gigapath",
+    "virchow_v1": "hf-hub:paige-ai/Virchow",
+    "virchow_v2": "hf-hub:paige-ai/Virchow2",
+    "musk": "hf_hub:xiangjx/musk",
+    "h_optimus_0": "hf-hub:bioptimus/H-optimus-0",
 }
 
 
 def get_model_hf_path(model_name):
     """
-    根据模型类型返回对应的 Hugging Face 地址。
+    return the huggingface path for the model
     """
     if model_name not in MODEL_HF_PATHS:
         raise ValueError(f"Unknown model name: {model_name}. Available models: {list(MODEL_HF_PATHS.keys())}")
@@ -104,11 +113,11 @@ class PLIPModel(BaseModel):
 @register_model("openai_clip_p16")
 class OpenAICLIPModel(PLIPModel):
     def __init__(self, checkpoint_path, device="cpu"):
-        # 指定模型名称为 "openai/clip-vit-base-patch32"
+        # "openai/clip-vit-base-patch32"
         super().__init__(checkpoint_path, device)
 
 
-@register_model('conch_v1_0')
+@register_model('conch_v1')
 class CONCHModel(BaseModel):
     def __init__(self, checkpoint_path, device='cpu'):
         super().__init__()
@@ -124,7 +133,7 @@ class CONCHModel(BaseModel):
     
     def _text_preprocess(self, text):
         from conch.open_clip_custom import tokenize
-        inputs = tokenize(texts=text, tokenizer=self.tokenizer)
+        inputs = tokenize(texts=text, tokenizer=self.tokenizer) # [1, 128]
         return inputs.squeeze(0)
 
     def forward(self, x):
@@ -140,27 +149,15 @@ class CONCHModel(BaseModel):
         return output
 
 
-@register_model('uni-1')
+@register_model('uni_v1')
 class UNIModel(BaseModel):
     def __init__(self, checkpoint_path, device='cpu'):
         super().__init__()
-        model_args = {
-            'model_name': 'vit_large_patch16_224',
-            'img_size': 224, 
-            'patch_size': 16, 
-            'init_values': 1e-5, 
-            'num_classes': 0, 
-            'dynamic_img_size': True
-        }
-        self.model = timm.create_model(**model_args)
-        self.model.load_state_dict(torch.load(checkpoint_path, map_location=device))
+        self.model = timm.create_model(checkpoint_path, 
+                                       pretrained=True, init_values=1e-5, dynamic_img_size=True)
         self.device = device
         self.model = self.model.to(self.device)
-        self.preprocess = transforms.Compose([
-                            transforms.Resize(224, interpolation=transforms.InterpolationMode.BICUBIC),
-                            transforms.ToTensor(),
-                            transforms.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
-                            ])
+        self.preprocess = create_transform(**resolve_data_config(self.model.pretrained_cfg, model=self.model))
 
         self.backbone = self.model
         self.image_preprocess = self.preprocess
@@ -172,12 +169,11 @@ class UNIModel(BaseModel):
         return output
     
 
-@register_model('uni-2')
+@register_model('uni_v2')
 class UNI2Model(BaseModel):
     def __init__(self, checkpoint_path, device='cpu'):
         super().__init__()
         timm_kwargs = {
-            'model_name': 'vit_giant_patch14_224',
             'img_size': 224, 
             'patch_size': 14, 
             'depth': 24,
@@ -192,19 +188,11 @@ class UNI2Model(BaseModel):
             'reg_tokens': 8, 
             'dynamic_img_size': True
         }
-        self.model = timm.create_model(
-            pretrained=False, **timm_kwargs
-        )
-        self.model.load_state_dict(torch.load(os.path.join(checkpoint_path), map_location="cpu"), strict=True)
+        self.model = timm.create_model(checkpoint_path, pretrained=True, **timm_kwargs)
+        self.preprocess = create_transform(**resolve_data_config(self.model.pretrained_cfg, model=self.model))
+
         self.device = device
         self.model = self.model.to(self.device)
-        self.preprocess = transforms.Compose(
-            [
-                transforms.Resize(224),
-                transforms.ToTensor(),
-                transforms.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
-            ]
-        )
         self.backbone = self.model
         self.image_preprocess = self.preprocess
     
@@ -214,32 +202,22 @@ class UNI2Model(BaseModel):
         return output
 
 
-@register_model('prov_gigapath_patch')
+@register_model('prov_gigapath_tile')
 class ProvGigaPathModel(BaseModel):
     def __init__(self, checkpoint_path, device='cpu'):
         super().__init__()
-        model_args = {
-            'model_name': "vit_giant_patch14_dinov2",
-            'img_size': 224,
-            'in_chans': 3,
-            'patch_size': 16,
-            'embed_dim': 1536,
-            'depth': 40,
-            'num_heads': 24,
-            'init_values': 1e-05,
-            'mlp_ratio': 5.33334,
-            'num_classes': 0
-        }
-        self.model = timm.create_model(**model_args)
-        self.model.load_state_dict(torch.load(checkpoint_path, map_location=device))
+
+        self.model = timm.create_model(checkpoint_path, pretrained=True)
         self.device = device
         self.model = self.model.to(self.device)
-        self.preprocess = transforms.Compose([
-                                            transforms.Resize(256, interpolation=transforms.InterpolationMode.BICUBIC),
-                                            transforms.CenterCrop(224),
-                                            transforms.ToTensor(),
-                                            transforms.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
-                                            ])
+        self.preprocess = transforms.Compose(
+            [
+                transforms.Resize(256, interpolation=transforms.InterpolationMode.BICUBIC),
+                transforms.CenterCrop(224),
+                transforms.ToTensor(),
+                transforms.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
+            ]
+        )
         self.backbone = self.model
         self.image_preprocess = self.preprocess
         
@@ -248,7 +226,137 @@ class ProvGigaPathModel(BaseModel):
         with torch.set_grad_enabled(self.model.training):
             output = self.model(x)
         return output
+    
 
+@register_model('virchow_v1')
+class VirchowModel(BaseModel):
+    def __init__(self, checkpoint_path, device='cpu'):
+        super().__init__()
+        # need to specify MLP layer and activation function for proper init
+        self.model = timm.create_model(checkpoint_path, pretrained=True, mlp_layer=SwiGLUPacked, act_layer=torch.nn.SiLU)
+        self.device = device
+        self.model = self.model.to(self.device)
+
+        self.preprocess = create_transform(**resolve_data_config(self.model.pretrained_cfg, model=self.model))
+        self.backbone = self.model
+        self.image_preprocess = self.preprocess
+
+    def forward(self, x):
+        with torch.set_grad_enabled(self.model.training):
+            output = self.model(x)  # size: 1 x 257 x 1280
+
+            class_token = output[:, 0]    # size: 1 x 1280
+            patch_tokens = output[:, 1:]  # size: 1 x 256 x 1280
+
+            # concatenate class token and average pool of patch tokens
+            embedding = torch.cat([class_token, patch_tokens.mean(1)], dim=-1) # size: 1 x 2560
+        return embedding
+
+
+@register_model('virchow_v2')
+class Virchow2Model(BaseModel):
+    def __init__(self, checkpoint_path, device='cpu'):
+        super().__init__(checkpoint_path, device)
+    
+    def forward(self, x):
+        with torch.set_grad_enabled(self.model.training):
+            output = self.model(x)  # size: 1 x 261 x 1280
+
+            class_token = output[:, 0]    # size: 1 x 1280
+            patch_tokens = output[:, 5:]  # size: 1 x 256 x 1280, tokens 1-4 are register tokens so we ignore those
+
+            # concatenate class token and average pool of patch tokens
+            embedding = torch.cat([class_token, patch_tokens.mean(1)], dim=-1)  # size: 1 x 2560
+        return embedding
+
+
+@register_model('musk')
+class MuskModel(BaseModel):
+    def __init__(self, checkpoint_path, device='cpu'):
+        super().__init__()
+        from musk import utils
+        model = timm.create_model("musk_large_patch16_384")
+        utils.load_model_and_may_interpolate(checkpoint_path, model, 'model|module', '')
+        self.model = model.to(device)
+        self.preprocess = transforms.Compose([
+            transforms.Resize(384, interpolation=transforms.InterpolationMode.BICUBIC),
+            transforms.CenterCrop((384, 384)),
+            transforms.ToTensor(),
+            transforms.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
+        ])
+        self.backbone = self.model
+        self.image_preprocess = self.preprocess
+
+        musk_spec = importlib.util.find_spec("musk")
+        if musk_spec is None:
+            raise ImportError("musk package is not installed.")
+        
+        musk_path = os.path.dirname(musk_spec.submodule_search_locations[0])
+        tokenizer_path = os.path.join(musk_path, "musk", "models", "tokenizer.spm")
+        self.tokenizer = XLMRobertaTokenizer(tokenizer_path)
+    
+    def _text_preprocess(self, text):
+        from musk import utils  
+
+        if isinstance(text_list, str):  
+            text_list = [text_list]
+
+        text_ids = []
+        for txt in text_list:
+            txt_ids, _ = utils.xlm_tokenizer(txt, self.tokenizer, max_len=100)
+            text_ids.append(torch.tensor(txt_ids).unsqueeze(0)) 
+
+        text_ids = torch.cat(text_ids, dim=0) 
+        return text_ids
+    
+    def forward(self, x):
+        with torch.set_grad_enabled(self.model.training):
+            output = self.model(
+                image=x,
+                with_head=False,
+                out_norm=True,
+                ms_aug=True,
+                return_global=True  
+                )[0]
+        return output
+    
+    def encode_text(self, text):
+        with torch.set_grad_enabled(self.model.training):
+            padding_mask = (text == self.tokenizer.pad_token_id).long()
+            text_embeddings = self.model(
+                text_description=text,
+                padding_mask=padding_mask,
+                with_head=False, 
+                out_norm=True,
+                ms_aug=False,
+                return_global=True 
+                )[1]
+        
+        return text_embeddings
+
+
+@register_model('h_optimus_0')
+class HOptimusModel(BaseModel):
+    def __init__(self, checkpoint_path, device='cpu'):
+        super().__init__()
+        self.model = timm.create_model(checkpoint_path, 
+                                       pretrained=True, init_values=1e-5, dynamic_img_size=False)
+        self.device = device
+        self.model = self.model.to(self.device)
+        self.preprocess = transforms.Compose([
+                transforms.ToTensor(),
+                transforms.Normalize(
+                    mean=(0.707223, 0.578729, 0.703617), 
+                    std=(0.211883, 0.230117, 0.177517)
+                ),
+            ])
+        self.backbone = self.model
+        self.image_preprocess = self.preprocess
+
+    def forward(self, x):
+        with torch.set_grad_enabled(self.model.training):
+            output = self.model(x)
+        return output
 
 
 

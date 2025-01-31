@@ -16,7 +16,7 @@ classifiers = [
     "License :: MIT",
 ]
 dependencies = [
-    'transformers', 'timm'
+    'transformers', 'timm', 'einops', 'sentencepiece'
 ]
 
 [tool.setuptools.packages.find]
