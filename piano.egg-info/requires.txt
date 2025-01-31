@@ -1,4 +1,0 @@
-transformers
-timm
-einops
-sentencepiece
