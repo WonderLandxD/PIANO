@@ -76,7 +76,7 @@ def parse():
     return parser.parse_args()
 
 if __name__ == '__main__':
-    setup_logging()
+    # setup_logging()
     args = parse()
     validate_args(args)
 
