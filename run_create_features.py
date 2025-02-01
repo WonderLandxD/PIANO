@@ -83,7 +83,7 @@ if __name__ == '__main__':
     args = parse()
     validate_args(args)
 
-    slide_list = glob.glob(f'{args.patch_slide_dir}/*/*')
+    slide_list = glob.glob(f'{args.patch_slide_dir}/*')
     save_dir = Path(args.save_dir)
     pair_list = generate_pair_list(slide_list, save_dir, args.model_name)
 
