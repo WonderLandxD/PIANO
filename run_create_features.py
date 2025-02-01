@@ -64,18 +64,26 @@ def parse():
     parser.add_argument('--save_dir', type=str, required=True, help='Directory to save features')
     parser.add_argument('--patch_slide_dir', type=str, required=True, help='Directory to patches (cropped by slides)')
 
+    parser.add_argument('--amp', type=str, default='fp32', choices=['fp32', 'fp16', 'bf16'],
+                       help='Mixed precision mode (fp32, fp16, bf16)')
+
+    parser.add_argument('--image-loader', type=str, default='jpeg4py',
+                       choices=['pil', 'jpeg4py', 'opencv'],
+                       help='Image loading method (pil|jpeg4py|opencv)')
 
     return parser.parse_args()
 
 if __name__ == '__main__':
-
+    
+    os.environ['OPENBLAS_NUM_THREADS'] = '1'  
+    
     mp.set_start_method('spawn', force=True)
 
-    setup_logging()
+    # setup_logging()
     args = parse()
     validate_args(args)
 
-    slide_list = glob.glob(f'{args.patch_slide_dir}/*')
+    slide_list = glob.glob(f'{args.patch_slide_dir}/*/*')
     save_dir = Path(args.save_dir)
     pair_list = generate_pair_list(slide_list, save_dir, args.model_name)
 
