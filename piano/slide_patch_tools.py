@@ -42,15 +42,13 @@ def save_image(img, path):
 
 
 def func_patching(args, pair_list, thread_id):
-
-    progress_bar = tqdm(total=len(pair_list), desc=f'THREAD {thread_id}', position=thread_id, ncols=75, leave=True)
-
+    total_slides = len(pair_list)  # 获取总slide数量
+    
     for item, pair_path in enumerate(pair_list):
         slide_path = pair_path[0]
         save_path = pair_path[1]
         os.makedirs(save_path, exist_ok=True)
 
-        
         slide = opensdpc.OpenSdpc(slide_path)
         thumbnail_level = slide.level_count - args.thumb_n
         thumbnail = np.array(slide.read_region((0, 0), thumbnail_level, slide.level_dimensions[thumbnail_level]).convert('RGB'))
@@ -68,8 +66,11 @@ def func_patching(args, pair_list, thread_id):
 
         coordinates = generate_patch_coordinates(img_x, img_y, x_size, y_size, x_overlap, y_overlap, bg_mask, args.blank_TH)
 
-        progress_bar.set_description(f'THREAD {thread_id} ({item+1} / {len(pair_list)})')
-        progress_bar.refresh()
+        patch_progress = tqdm(total=len(coordinates), 
+                            desc=f'THREAD {thread_id} Slide {item+1}/{total_slides}', 
+                            position=thread_id, 
+                            ncols=90,  # 调整宽度以适应更长描述
+                            leave=False)
 
         for idx, (i, j) in enumerate(coordinates):
             x_start = int(i * (x_size - x_overlap))
@@ -79,14 +80,11 @@ def func_patching(args, pair_list, thread_id):
 
             img = slide.read_region((x_start, y_start), args.WSI_level, (x_offset, y_offset)).convert('RGB')
             save_image(img, os.path.join(save_path, f"no{idx:06d}_{x_start:09d}x_{y_start:09d}y.jpg"))
+            patch_progress.update(1)
+
+        patch_progress.close()
 
         thumbnail_save_path = os.path.join(save_path, 'thumbnail/x20_thumbnail.jpg')
         os.makedirs(os.path.dirname(thumbnail_save_path), exist_ok=True)
         x20_thumbnail = Image.fromarray(thumbnail)
         save_image(x20_thumbnail, thumbnail_save_path)
-
-        progress_bar.update(1)
-
-    progress_bar.close()
-
-
