@@ -59,7 +59,7 @@ def validate_args(args):
         raise ValueError("Number of threads must be greater than 0")
 
 def parse():
-    parser = argparse.ArgumentParser(description='Multithreaded patch generation for hitopathology whole slide images using PIANO and opensdpc library.')
+    parser = argparse.ArgumentParser(description='Multithreaded patch generation for histopathology whole slide images using PIANO and opensdpc library.')
     parser.add_argument('--n_thread', type=int, default=16, help='Number of threads to use')
     # Hyperparameters for patch generation
     parser.add_argument('--patch_w', type=int, default=256, help='Width of patch')
