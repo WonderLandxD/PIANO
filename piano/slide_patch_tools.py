@@ -42,7 +42,7 @@ def save_image(img, path):
 
 
 def func_patching(args, pair_list, thread_id):
-    total_slides = len(pair_list)  # 获取总slide数量
+    total_slides = len(pair_list) 
     
     for item, pair_path in enumerate(pair_list):
         slide_path = pair_path[0]
@@ -69,7 +69,7 @@ def func_patching(args, pair_list, thread_id):
         patch_progress = tqdm(total=len(coordinates), 
                             desc=f'THREAD {thread_id} Slide {item+1}/{total_slides}', 
                             position=thread_id, 
-                            ncols=90,  # 调整宽度以适应更长描述
+                            ncols=90,  
                             leave=False)
 
         for idx, (i, j) in enumerate(coordinates):
