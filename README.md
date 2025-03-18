@@ -112,12 +112,12 @@ image_preprocess = model.image_preprocess
 text_preprocess = model.text_preprocess
 
 # 2. Load the image
-image = Image.open('./img/sample_lusc.jpg')  # 256px * 256px 分辨率
-text_labels = ["lung adenocarcinoma", "lung squamous cell carcinoma", "normal"]  # 候选的文本标签
+image = Image.open('./img/sample_lusc.jpg')  # 256px * 256px resolution
+text_labels = ["lung adenocarcinoma", "lung squamous cell carcinoma", "normal"]  # Candidate text labels
 
 # 3. Use the model's preprocessing functions to process the image and text
 image_tensor = image_preprocess(image).unsqueeze(0).cuda()  # [1, 3, 256, 256]
-text_tensors = [text_preprocess([label]).unsqueeze(0).cuda() for label in text_labels]  # 每个标签 [1, 77]
+text_tensors = [text_preprocess([label]).unsqueeze(0).cuda() for label in text_labels]  # Each label [1, 77]
 
 # 4. Extract features
 model.eval()
@@ -126,7 +126,7 @@ with torch.inference_mode():
     img_feat = model.encode_image(image_tensor)  # [1, C]
     
     # Encode all text features
-    text_feats = torch.cat([model.encode_text(text_tensor) for text_tensor in text_tensors])  # [N, C], N 是标签数量
+    text_feats = torch.cat([model.encode_text(text_tensor) for text_tensor in text_tensors])  # [N, C], N is the number of labels
 
     # 6. Calculate the similarity between the image features and each text feature
     similarities = torch.nn.functional.cosine_similarity(img_feat, text_feats, dim=1)  # [N]
