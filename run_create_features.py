@@ -25,8 +25,8 @@ def generate_pair_list(slide_list, save_dir, model):
     for slide_path in slide_list:
         slide_name = os.path.basename(slide_path)
         thumb_path = os.path.join(slide_path, 'thumbnail/x20_thumbnail.jpg')
-        save_path = os.path.join(save_dir, model, slide_name, 'features')
-        feat_path = os.path.join(save_path, f'{slide_name}_{model}.pt')
+        save_path = os.path.join(save_dir, slide_name, model)
+        feat_path = os.path.join(save_path, f'piano_{slide_name}_{model}.pth')
         if os.path.exists(thumb_path) and not os.path.exists(feat_path):
             pair_list.append([slide_path, feat_path])
     return pair_list
@@ -50,26 +50,18 @@ def validate_args(args):
         raise ValueError("Number of GPUs must be greater than 0")
 
 def parse():
-    parser = argparse.ArgumentParser(description='Multithreaded feature exctraction for hitopathology whole slide images using PIANO and opensdpc library.')
+    parser = argparse.ArgumentParser(description='Multithreaded feature extraction for histopathology whole slide images using PIANO and opensdpc library.')
     parser.add_argument('--batch_size', type=int, default=1, help='Batch size for extracting features')
-
-    parser.add_argument('--model_name', type=str, default=None, required=True, 
-    help='Pathology foundation model name of feature extractor')
-
+    parser.add_argument('--model_name', type=str, default=None, required=True, help='Pathology foundation model name of feature extractor')
+    parser.add_argument('--local_dir', type=bool, default=False, help='Using local directory of feature extractor')
     parser.add_argument('--ckpt', type=str, default=None, required=True, help='Checkpoint path of feature extractor')
-
     parser.add_argument('--gpu_num', type=int, default=1, help='Number of GPUs to use')
     parser.add_argument('--num_workers', type=int, default=1, help='Number of workers')
-
     parser.add_argument('--save_dir', type=str, required=True, help='Directory to save features')
     parser.add_argument('--patch_slide_dir', type=str, required=True, help='Directory to patches (cropped by slides)')
-
-    parser.add_argument('--amp', type=str, default='fp32', choices=['fp32', 'fp16', 'bf16'],
-                       help='Mixed precision mode (fp32, fp16, bf16)')
-
-    parser.add_argument('--image-loader', type=str, default='jpeg4py',
-                       choices=['pil', 'jpeg4py', 'opencv'],
-                       help='Image loading method (pil|jpeg4py|opencv)')
+    parser.add_argument('--amp', type=str, default='fp32', choices=['fp32', 'fp16', 'bf16'], help='Mixed precision mode (fp32, fp16, bf16)')
+    parser.add_argument('--image_loader', type=str, default='jpeg4py', choices=['pil', 'jpeg4py', 'opencv'], help='Image loading method (pil|jpeg4py|opencv)')
+    parser.add_argument('--image_preprocess', type=str, default=None, help='Path to the YAML file containing image preprocessing configurations')
 
     return parser.parse_args()
 

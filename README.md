@@ -1,4 +1,4 @@
-# 🎶 PIANO: Pathology Image Analysis Orchestrator 
+# 🎶 PIANO: Pathology Image ANalysis Orchestrator 
 
 **PIANO** is a simple PyTorch library for pathology image analysis. It helps you generate patches from whole-slide images, use pathology foundation models for feature extraction, and more! 🚀
 
@@ -13,6 +13,10 @@
 •	🌍 More functionality will be released in the future.
 
 ---------
+
+## 📰 News
+
+**2025-03-18:** Enhanced model flexibility with local loading support, added `CTransPath (CHIEF-based weights)` model, and introduced YAML-based preprocessing customization and coordinate saving.
 
 ## 🎈 Installation
 
@@ -48,60 +52,97 @@ python run_generate_patches.py --n_thread Number_of_threads_to_use --csv_path Pa
 
 We use [PLIP](https://www.nature.com/articles/s41591-023-02504-3) as an example.
 
-•	model_name='plip': Specifies the foundation model.
+```bash
+# Set up Hugging Face mirror (if you encounter issues downloading models)
+export HF_ENDPOINT='https://hf-mirror.com'
 
-•	checkpoint_path='vinid/plip': Path to the pretrained PLIP model checkpoint (from HuggingFace or local path).
+# Log in to Hugging Face (replace with your write token)
+huggingface-cli login --token <huggingface_write_token>
 
-•	device='cuda:0': Choose the device to run the model (e.g., cuda, cuda:0, cuda:1, or CPU).
+# Download the model and customize the path
+# Set the model name and custom path
+export MODEL_NAME='vinid/plip'
+export CUSTOM_PATH='/your/custom/path'
 
-```
-# Set the Hugging Face endpoint to the mirror if you have trobule downloading the model
-os.environ['HF_ENDPOINT'] = 'https://hf-mirror.com'
-
-# Login to Hugging Face
-from huggingface_hub import login
-login(<huggingface write token>)
-```
-
-```
-# Load the PLIP model and preprocessing functions
-
-model, image_preprocess, text_preprocess = piano.create_piano(
-    model_name='plip', 
-    checkpoint_path='vinid/plip', 
-    device='cuda:0'
-)
+# Use huggingface-cli to download the model to the custom path
+huggingface-cli download $MODEL_NAME --cache-dir $CUSTOM_PATH
 ```
 
-•	model: The foundation model used for feature extraction.
-
-•	image_preprocess: Preprocessing function for image input (scaling, normalization, etc.).
-
-•	text_preprocess: Preprocessing function for text input (tokenization, padding, etc.).
-
-### Example Usage:
-
+```python
+# Load the PLIP model from Hugging Face
+import piano
+model = piano.create_model("plip").cuda()
 ```
+
+```python
+# Load the PLIP model from local path
+model = piano.create_model("plip", checkpoint_path="/your/custom/path", local_dir=True).cuda()
+```
+
+```python
+# Load the image preprocess and text preprocess from the original model (not all models have text preprocess)
+image_preprocess = model.image_preprocess
+text_preprocess = model.text_preprocess
+```
+
+•	**model:** The pathology foundation model.
+
+•	**image_preprocess:** Preprocessing function for image input (scaling, normalization, etc.).
+
+•	**text_preprocess:** Preprocessing function for text input (tokenization, padding, etc.).
+
+### Example Usage of all codes:
+
+```python
+# Import necessary libraries
+import torch
 from PIL import Image
+import numpy as np
+import piano
 
-# Load an image
-image = Image.open('path_to_image.jpg') # 256px * 256px resolution
-text = ["LUSC", "LUAD"]
+# 1. Define the model
+# Load the PLIP model from Hugging Face
+model = piano.create_model("plip").cuda()
 
-# Preprocess the image and text
+# Or load the model from a local path
+# model = piano.create_model("plip", checkpoint_path="/your/custom/path", local_dir=True).cuda()
+
+# Get the model's preprocessing functions
+image_preprocess = model.image_preprocess
+text_preprocess = model.text_preprocess
+
+# 2. Load the image
+image = Image.open('./img/sample_lusc.jpg')  # 256px * 256px 分辨率
+text_labels = ["lung adenocarcinoma", "lung squamous cell carcinoma", "normal"]  # 候选的文本标签
+
+# 3. Use the model's preprocessing functions to process the image and text
 image_tensor = image_preprocess(image).unsqueeze(0).cuda()  # [1, 3, 256, 256]
-text_tensor = text_preprocess(text).unsqueeze(0).cuda()  # [2, 77]
+text_tensors = [text_preprocess([label]).unsqueeze(0).cuda() for label in text_labels]  # 每个标签 [1, 77]
 
-model.set_mode('eval')
+# 4. Extract features
+model.eval()
 with torch.inference_mode():
-    # Encode image and text features
-    img_feat = model.encode_image(image_tensor) # [1, C]
-    text_feat = model.encode_text(text_tensor) # [2, C]
+    # Encode image features
+    img_feat = model.encode_image(image_tensor)  # [1, C]
+    
+    # Encode all text features
+    text_feats = torch.cat([model.encode_text(text_tensor) for text_tensor in text_tensors])  # [N, C], N 是标签数量
+
+    # 6. Calculate the similarity between the image features and each text feature
+    similarities = torch.nn.functional.cosine_similarity(img_feat, text_feats, dim=1)  # [N]
+
+    # 7. Find the most similar label
+    best_match_idx = torch.argmax(similarities).item()
+    best_match_label = text_labels[best_match_idx]
+
+# 8. Output the result
+print(f"The image most likely belongs to the category: {best_match_label}")
+print(f"Similarity scores for all categories: {dict(zip(text_labels, similarities.cpu().numpy()))}")
 ```
 
-•	model.encode_image: Extracts features from the image.
+•	**model.encode_image:** Extracts features from the image.
 
-•	model.encode_text: Extracts features from the text.
+•	**model.encode_text:** Extracts features from the text.
 
   - For **visual-only models**, `model.encode_image` works *without normalization*, but `text_preprocess` and `model.encode_text` will be *inactive*.
   - For **visual-language models**, both `model.encode_image` and `model.encode_text` are processed *with normalization (F.normalize)*.
@@ -109,11 +150,7 @@ with torch.inference_mode():
 **Additional Notes:**
 
 - `model.backbone`: This is the raw model used for feature extraction. You can access it directly if needed.
-- `image_preprocess`: These are the valid preprocessing (transform) functions that prepare the batch image before passing it to the model.
-- `text_preprocess`:These are the preprocessing functions that prepare the text list before passing it to the model.
-- `model.forward`: This is the function that handles the actual image feature extraction, performing forward propagation in the network.
-- `model.set_mode('eval')`: Sets the model to evaluation mode. This is necessary when you’re testing or inferring with the model, ensuring dropout layers (if any) are turned off.
-- `model.set_mode('train')`: Sets the model to training mode. This enables dropout layers and other training-specific behaviour.
+- `model.get_img_token`: Returns the output, which contains output['patch_tokens'] and output['class_token'].
 - `piano.get_model_hf_path(model_name)`: Returns the Hugging Face model path for a given model name. This is useful if you want to load a model checkpoint from Hugging Face.
 
 ### Model Checkpoint Paths and Sources
@@ -121,18 +158,19 @@ with torch.inference_mode():
 |--------------------------|------------------------------------|-----------------------------------------------------------------------------------|
 | `plip`                   | `vinid/plip`                       | [Hugging Face - vinid/plip](https://huggingface.co/vinid/plip)                    |
 | `openai_clip_p16`        | `openai/clip-vit-base-patch16`     | [Hugging Face - openai/clip-vit-base-patch16](https://huggingface.co/openai/clip-vit-base-patch16) |
-| `conch_v1`               | `local_dir`                        | [Hugging Face - MahmoodLab/CONCH](https://huggingface.co/MahmoodLab/CONCH) |
-| `uni_v1`                  | `hf-hub:MahmoodLab/uni`                        | [Hugging Face - MahmoodLab/UNI](https://huggingface.co/MahmoodLab/UNI) |
-| `uni_v2`                  | `hf-hub:MahmoodLab/UNI2-h`                        | [Hugging Face - MahmoodLab/UNI2-h](https://huggingface.co/MahmoodLab/UNI2-h) |
-| `prov_gigapath_tile`      | `hf_hub:prov-gigapath/prov-gigapath` | [Hugging Face - prov-gigapath/prov-gigapath](https://huggingface.co/prov-gigapath/prov-gigapath) |
-| `virchow_v1`              | `hf_hub:paige-ai/Virchow`            | [Hugging Face - paige-ai/Virchow](https://huggingface.co/paige-ai/Virchow) |
-| `virchow_v2`              | `hf_hub:paige-ai/Virchow2`           | [Hugging Face - paige-ai/Virchow2](https://huggingface.co/paige-ai/Virchow2) |
-| `musk`                     | `hf_hub:xiangjx/musk`                | [Hugging Face - xiangjx/musk](https://huggingface.co/xiangjx/musk) |
-| `h_optimus_0`              | `hf_hub:bioptimus/H-optimus-0`        | [Hugging Face - bioptimus/H-optimus-0](https://huggingface.co/bioptimus/H-optimus-0) |
+| `conch_v1`               | `hf_hub:MahmoodLab/conch`          | [Hugging Face - MahmoodLab/CONCH](https://huggingface.co/MahmoodLab/CONCH) |
+| `uni_v1`                 | `hf-hub:MahmoodLab/uni`            | [Hugging Face - MahmoodLab/UNI](https://huggingface.co/MahmoodLab/UNI) |
+| `uni_v2`                 | `hf-hub:MahmoodLab/UNI2-h`         | [Hugging Face - MahmoodLab/UNI2-h](https://huggingface.co/MahmoodLab/UNI2-h) |
+| `prov_gigapath`          | `hf_hub:prov-gigapath/prov-gigapath` | [Hugging Face - prov-gigapath/prov-gigapath](https://huggingface.co/prov-gigapath/prov-gigapath) |
+| `virchow_v1`             | `hf-hub:paige-ai/Virchow`          | [Hugging Face - paige-ai/Virchow](https://huggingface.co/paige-ai/Virchow) |
+| `virchow_v2`             | `hf-hub:paige-ai/Virchow2`         | [Hugging Face - paige-ai/Virchow2](https://huggingface.co/paige-ai/Virchow2) |
+| `musk`                   | `hf_hub:xiangjx/musk`              | [Hugging Face - xiangjx/musk](https://huggingface.co/xiangjx/musk) |
+| `h_optimus_0`            | `hf-hub:bioptimus/H-optimus-0`     | [Hugging Face - bioptimus/H-optimus-0](https://huggingface.co/bioptimus/H-optimus-0) |
+| `ctranspath`             | `YOUR_LOCAL_PATH`                  | --- |
 
-**Note**: `local_dir` means the path to your local model files downloaded from the official source. 
+**Note**: `local_dir` means the path to your local model files downloaded from the official source.
 
-*More models will be supported (Updated on 01-31-2025).*
+*More models will be supported (Updated on 03-18-2025).*
 
 ### 🌞 *3. Using pathology foundation models to create patch features.*
 
@@ -143,16 +181,18 @@ python run_create_features.py \
     --ckpt model_weight_path \
     --gpu_num 1 \
     --save_dir save_directory \
-    --patch_slide_dir patches_derectory
+    --patch_slide_dir patches_derectory \
+    --image_preprocess image_preprocess.yaml
 ```
 
-- batch_size: (int) Batch size for feature extraction. Default is 1.
-- model_name: (str) The name of the pathology foundation model to use for feature extraction (e.g., "plip", "openai_clip_p16"). This is a required argument.
-- ckpt: (str) Path to the checkpoint file for the chosen model. This is a required argument.
-- gpu_num: (int) The number of GPUs to use. Default is 1.
-- num_workers: (int) Number of workers for loading data. Default is 1.
-- save_dir: (str) Directory where the extracted features will be saved. This is a required argument.
-- patch_slide_dir: (str) Directory containing the patches (cropped from slides). This is a required argument.
+- **batch_size:** (int) Batch size for feature extraction. Default is 1.
+- **model_name:** (str) The name of the pathology foundation model to use for feature extraction (e.g., "plip", "openai_clip_p16"). This is a required argument.
+- **ckpt:** (str) Path to the checkpoint file for the chosen model. This is a required argument.
+- **gpu_num:** (int) The number of GPUs to use. Default is 1.
+- **num_workers:** (int) Number of workers for loading data. Default is 1.
+- **save_dir:** (str) Directory where the extracted features will be saved. This is a required argument.
+- **patch_slide_dir:** (str) Directory containing the patches (cropped from slides). This is a required argument.
+- **image_preprocess:** (str) Path to the YAML file containing image preprocessing configurations.
 
 
 

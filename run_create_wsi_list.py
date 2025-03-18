@@ -7,15 +7,10 @@ import argparse
 
 def parse():
     parser = argparse.ArgumentParser(description='Create WSI file list (csv format) for patch generation.')
-    parser.add_argument('--data_folder', type=str, required=True,
-                      help='Root directory path containing WSI files')
-    parser.add_argument('--dataset_name', type=str, required=True,
-                      help='Dataset name')
-    parser.add_argument('--save_dir', type=str, required=True,
-                      help='Directory to save CSV file')
-    parser.add_argument('--file_types', type=str, nargs='+',
-                      default=['.svs', '.sdpc', '.tiff', '.tif', '.ndpi'],
-                      help='List of WSI file extensions to search for')
+    parser.add_argument('--data_folder', type=str, required=True, help='Root directory path containing WSI files')
+    parser.add_argument('--dataset_name', type=str, required=True, help='Dataset name')
+    parser.add_argument('--save_dir', type=str, required=True, help='Directory to save CSV file')
+    parser.add_argument('--file_types', type=str, nargs='+', default=['.svs', '.sdpc', '.tiff', '.tif', '.ndpi'], help='List of WSI file extensions to search for')
     return parser.parse_args()
 
 
