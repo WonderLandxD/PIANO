@@ -90,6 +90,7 @@ class PLIPModel(BaseModel):
 
         self.image_preprocess = self._image_preprocess
         self.text_preprocess = self._text_preprocess
+        self.output_dim = 512
     
     def _image_preprocess(self, image):
         inputs = self.processor(images=image, return_tensors='pt')
@@ -134,6 +135,7 @@ class OpenAICLIPModel(PLIPModel):
             checkpoint_path = get_model_hf_path('openai_clip_p16')
         
         super().__init__(checkpoint_path)
+        self.output_dim = 512
 
 
 @register_model('conch_v1')
@@ -151,6 +153,7 @@ class CONCHModel(BaseModel):
 
         self.image_preprocess = self.preprocess
         self.text_preprocess = self._text_preprocess
+        self.output_dim = 512
     
     def _text_preprocess(self, text):
         from conch.open_clip_custom import tokenize
@@ -190,6 +193,7 @@ class UNIModel(BaseModel):
             self.backbone = timm.create_model(checkpoint_path, pretrained=True, init_values=1e-5, dynamic_img_size=True)
             preprocess = create_transform(**resolve_data_config(self.backbone.pretrained_cfg, model=self.backbone))
             self.image_preprocess = preprocess
+        self.output_dim = 1024
         
     def forward(self, x):
         with torch.set_grad_enabled(self.backbone.training):
@@ -240,6 +244,7 @@ class UNI2Model(BaseModel):
         
         self.preprocess = preprocess
         self.image_preprocess = self.preprocess
+        self.output_dim = 1536
     
     def forward(self, x):
         with torch.set_grad_enabled(self.backbone.training):
@@ -275,6 +280,7 @@ class ProvGigaPathModel(BaseModel):
             ]
         )
         self.image_preprocess = preprocess
+        self.output_dim = 1536
         
     
     def forward(self, x):
@@ -303,6 +309,7 @@ class VirchowModel(BaseModel):
             preprocess = create_transform(**resolve_data_config(self.backbone.pretrained_cfg, model=self.backbone))
             
         self.image_preprocess = preprocess
+        self.output_dim = 2560
 
     def forward(self, x):
         with torch.set_grad_enabled(self.backbone.training):
@@ -334,6 +341,7 @@ class Virchow2Model(BaseModel):
             preprocess = create_transform(**resolve_data_config(self.backbone.pretrained_cfg, model=self.backbone))
 
         self.image_preprocess = preprocess
+        self.output_dim = 2560
         
         super().__init__(checkpoint_path)
     
@@ -376,6 +384,7 @@ class MuskModel(BaseModel):
             transforms.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
         ])
         self.image_preprocess = self.preprocess
+        self.output_dim = 1024
 
         musk_spec = importlib.util.find_spec("musk")
         if musk_spec is None:
@@ -450,6 +459,7 @@ class HOptimusModel(BaseModel):
                 ),
             ])
         self.image_preprocess = self.preprocess
+        self.output_dim = 1536
 
     def forward(self, x):
         with torch.set_grad_enabled(self.backbone.training):
@@ -464,7 +474,6 @@ class HOptimusModel(BaseModel):
 
 
 def to_2tuple(x):
-    """将输入转换为二元组"""
     if isinstance(x, (list, tuple)):
         if len(x) == 2:
             return tuple(x)
@@ -526,6 +535,7 @@ class CTransPathModel(BaseModel):
             transforms.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
         ])
         self.image_preprocess = preprocess
+        self.output_dim = 768
             
         
     def forward(self, x):
@@ -548,8 +558,8 @@ def create_model(model_name, checkpoint_path=None, local_dir=False):
 
 
 if __name__ == "__main__":
-    model = create_model("ctranspath", '/mnt/sdb/ljw/piano_weights/CHIEF/CHIEF_CTransPath.pth', local_dir=True).cuda()
-    image = torch.randn(1, 3, 224, 224).cuda()
+    model = create_model("musk").cuda()
+    image = torch.randn(1, 3, 384, 384).cuda()
     output = model.get_img_token(image)
     print(output["patch_tokens"].shape)
     print(output["class_token"].shape)

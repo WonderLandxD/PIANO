@@ -4,17 +4,21 @@
 
 **Features ✨**
 
-•	🖼️ **Whole-slide image processing**: Load and preprocess whole slide images easily.
+•	🖼️ **Whole-slide image processing**: Load and preprocess whole slide images (WSIs) easily.
 
-•	🧩 **Patch generation**: Automatically generate patches for model training.
+•	🧩 **Patch generation**: Automatically generate patches from WSIs in parallel.
 
-•	🧠 **Foundation models**: Use pre-trained pathology foundation models to extract powerful features.
+•	🧠 **Foundation models**: Use pretrained pathology foundation models to extract powerful features.
+
+• 🚇 **Fine-tuning patch-level tasks**: Lightweight code to fine-tune foundation models for patch-level classification.
 
 •	🌍 More functionality will be released in the future.
 
 ---------
 
 ## 📰 News
+
+**2025-03-19:** Added fine-tuning codes for patch-level classification tasks. Optimized some codes. 
 
 **2025-03-18:** Enhanced model flexibility with local loading support, added `CTransPath (CHIEF-based weights)` model, and introduced YAML-based preprocessing customization and coordinate saving.
 
@@ -36,22 +40,25 @@ pip install -e .
 ## 📚 Usage
 
 ### 🪐 *1. Generating patches from histopathology whole slide images (WSIs).*
-To batch-generate patches for WSIs, we first run the command `run_create_wsi_list.py` as follows:
+To batch-generate patches for WSIs, we first run the command `scripts/wsi_preprocess/run_generate_wsi_list.py` as follows:
 
-```
-python run_create_wsi_list.py --data_folder Root_directory_path_containing_WSI_files --dataset_name Dataset_name --save_dir Directory_to_save_CSV_file
+```bash
+cd scripts/wsi_preprocess
+
+python run_generate_wsi_list.py --data_folder <Root_directory_path_containing_WSI_files> --dataset_name <Dataset_name> --save_dir <Directory_to_save_CSV_file>
 ```
 
-Then run the command `run_generate_patches.py` as follows. We recommend using **8** processes since it works on regular CPU:
+Then run the command `scripts/wsi_preprocess/run_generate_patches.py` as follows. We recommend using **8** processes since it works on regular CPU:
 
-```
-python run_generate_patches.py --n_thread Number_of_threads_to_use --csv_path Path_to_the_CSV_file --save_dir Directory_to_save_patches
+```bash
+python run_generate_patches.py --n_thread 8 --csv_path <Path_to_the_CSV_file> --save_dir <Directory_to_save_patches>
 ```
 
 ### 🌕 *2. Define a pretrained pathology foundation model.*
 
 We use [PLIP](https://www.nature.com/articles/s41591-023-02504-3) as an example.
 
+First download the pretrained weights.
 ```bash
 # Set up Hugging Face mirror (if you encounter issues downloading models)
 export HF_ENDPOINT='https://hf-mirror.com'
@@ -62,62 +69,69 @@ huggingface-cli login --token <huggingface_write_token>
 # Download the model and customize the path
 # Set the model name and custom path
 export MODEL_NAME='vinid/plip'
-export CUSTOM_PATH='/your/custom/path'
+export CUSTOM_PATH='<your_custom_path>'
 
 # Use huggingface-cli to download the model to the custom path
 huggingface-cli download $MODEL_NAME --cache-dir $CUSTOM_PATH
 ```
 
+Then define the model in Python.
+
 ```python
 # Load the PLIP model from Hugging Face
-import piano
-model = piano.create_model("plip").cuda()
+from piano import create_model
+model = create_model("plip").cuda()
+# Note: Some models may not be defined from hugging face.
 ```
 
 ```python
 # Load the PLIP model from local path
-model = piano.create_model("plip", checkpoint_path="/your/custom/path", local_dir=True).cuda()
+model = create_model("plip", checkpoint_path="<your_custom_path>", local_dir=True).cuda()
+# Note: some models may not be defined from local path.
 ```
 
 ```python
 # Load the image preprocess and text preprocess from the original model (not all models have text preprocess)
 image_preprocess = model.image_preprocess
 text_preprocess = model.text_preprocess
+output_dim = model.output_dim
 ```
 
-•	**model:** The pathology foundation model.
+•	**model:** The well-pretrained pathology foundation model.
 
 •	**image_preprocess:** Preprocessing function for image input (scaling, normalization, etc.).
 
 •	**text_preprocess:** Preprocessing function for text input (tokenization, padding, etc.).
 
+•	**output_dim:** The output dimension of the model.
+
 ### Example Usage of all codes:
 
 ```python
-# Import necessary libraries
 import torch
+import torch.nn.functional as F
 from PIL import Image
 import numpy as np
-import piano
+from piano import create_model
 
 # 1. Define the model
 # Load the PLIP model from Hugging Face
-model = piano.create_model("plip").cuda()
+model = create_model("plip").cuda()
 
 # Or load the model from a local path
-# model = piano.create_model("plip", checkpoint_path="/your/custom/path", local_dir=True).cuda()
+# model = create_model("plip", checkpoint_path="<your_custom_path>", local_dir=True).cuda()
 
 # Get the model's preprocessing functions
 image_preprocess = model.image_preprocess
 text_preprocess = model.text_preprocess
 
 # 2. Load the image
-image = Image.open('./img/sample_lusc.jpg')  # 256px * 256px resolution
+image = Image.open('./img/sample_lusc.png')  # 256px * 256px resolution
 text_labels = ["lung adenocarcinoma", "lung squamous cell carcinoma", "normal"]  # Candidate text labels
 
 # 3. Use the model's preprocessing functions to process the image and text
 image_tensor = image_preprocess(image).unsqueeze(0).cuda()  # [1, 3, 256, 256]
-text_tensors = [text_preprocess([label]).unsqueeze(0).cuda() for label in text_labels]  # Each label [1, 77]
+text_tensors = text_preprocess(text_labels).unsqueeze(0).cuda()  # Each label [3, 77]
 
 # 4. Extract features
 model.eval()
@@ -126,18 +140,14 @@ with torch.inference_mode():
     img_feat = model.encode_image(image_tensor)  # [1, C]
     
     # Encode all text features
-    text_feats = torch.cat([model.encode_text(text_tensor) for text_tensor in text_tensors])  # [N, C], N is the number of labels
+    text_feats = model.encode_text(text_tensors) # [N, C], N is the number of labels
 
-    # 6. Calculate the similarity between the image features and each text feature
-    similarities = torch.nn.functional.cosine_similarity(img_feat, text_feats, dim=1)  # [N]
+    # Calculate similarity logits and probabilities
+    logits = 100.0 * (img_feat @ text_feats.T)
+    probs = logits.softmax(dim=-1)
 
-    # 7. Find the most similar label
-    best_match_idx = torch.argmax(similarities).item()
-    best_match_label = text_labels[best_match_idx]
+print("Label probs:", probs)
 
-# 8. Output the result
-print(f"The image most likely belongs to the category: {best_match_label}")
-print(f"Similarity scores for all categories: {dict(zip(text_labels, similarities.cpu().numpy()))}")
 ```
 
 •	**model.encode_image:** Extracts features from the image.
@@ -182,7 +192,7 @@ python run_create_features.py \
     --gpu_num 1 \
     --save_dir save_directory \
     --patch_slide_dir patches_derectory \
-    --image_preprocess image_preprocess.yaml
+    --image_preprocess ../transform_configs/create_patch_feats_transforms.yaml
 ```
 
 - **batch_size:** (int) Batch size for feature extraction. Default is 1.
@@ -193,6 +203,11 @@ python run_create_features.py \
 - **save_dir:** (str) Directory where the extracted features will be saved. This is a required argument.
 - **patch_slide_dir:** (str) Directory containing the patches (cropped from slides). This is a required argument.
 - **image_preprocess:** (str) Path to the YAML file containing image preprocessing configurations.
+
+### ⭐ *4. Fine-tuning patch-level tasks.*
+Coming soon!
+
+*Jiawen Li, H&G Pathology AI Research Team*
 
 
 

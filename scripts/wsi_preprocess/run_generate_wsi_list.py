@@ -38,7 +38,7 @@ def main():
     
     # Create save path
     today = date.today()
-    csv_file_path = os.path.join(args.save_dir, f'{args.dataset_name}_{today}.csv')
+    csv_file_path = os.path.join(args.save_dir, f'{args.dataset_name}_wsi_{today}.csv')
     
     # Save to CSV
     save_to_csv(wsi_files, csv_file_path)

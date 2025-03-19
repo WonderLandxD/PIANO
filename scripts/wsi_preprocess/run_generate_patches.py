@@ -6,7 +6,7 @@ import numpy as np
 from tqdm import tqdm
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
-from piano.slide_patch_tools import func_patching
+from piano.wsi_preprocess.slide_patch_tools import func_patching
 
 def setup_logging():
     logging.basicConfig(

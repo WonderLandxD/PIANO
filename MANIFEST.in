@@ -1,1 +1,4 @@
 include piano/*.py
+include piano/preprocess/*.py
+include piano/roi_classification/*.py
+include piano/utils/*.py

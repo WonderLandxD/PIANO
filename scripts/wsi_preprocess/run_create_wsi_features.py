@@ -8,7 +8,7 @@ import multiprocessing
 import logging
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from pathlib import Path
-from piano.slide_feat_tools import func_feat_ext
+from piano.wsi_preprocess.slide_feat_tools import func_feat_ext
 
 def setup_logging():
     logging.basicConfig(

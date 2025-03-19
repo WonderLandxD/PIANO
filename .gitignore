@@ -39,3 +39,11 @@ ENV/
 # Local development settings
 .DS_Store
 Thumbs.db 
+
+# Exclude custom_models folder
+custom_models/
+
+# Exclude demo_roi_classification folder
+demo_roi_classification/
+
+convert_csv_to_json.py

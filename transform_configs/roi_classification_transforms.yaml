@@ -1,0 +1,52 @@
+# ROI classification task image preprocessing configuration
+# Each transform is a dictionary containing 'name' and optional 'params' fields
+# 'name' is the class name in torchvision.transforms
+# 'params' are the parameters for that transform, provided as a dictionary
+
+# Default simple transform (uncommented)
+transforms:
+  - name: Resize
+    params:
+      size: [224, 224]
+  - name: ToTensor
+  - name: Normalize
+    params:
+      mean: [0.485, 0.456, 0.406]
+      std: [0.229, 0.224, 0.225]
+
+
+#################
+# Example transforms (commented out)
+#################
+#  # Random crop and resize
+#  - name: RandomResizedCrop
+#    params:
+#      size: [224, 224]  # Output image size
+#      scale: [0.8, 1.0] # Random crop area ratio range
+#      ratio: [0.75, 1.33] # Random crop aspect ratio range
+
+#  # Random horizontal flip
+#  - name: RandomHorizontalFlip
+#    params:
+#      p: 0.5  # Flip probability
+
+#  # Random vertical flip
+#  - name: RandomVerticalFlip
+#    params:
+#      p: 0.5  # Flip probability
+
+#  # Color jitter
+#  - name: ColorJitter
+#    params:
+#      brightness: 0.2  # Brightness adjustment range
+#      contrast: 0.2    # Contrast adjustment range
+#      saturation: 0.2  # Saturation adjustment range
+#      hue: 0.1         # Hue adjustment range
+
+#  # Random erasing (data augmentation)
+#  - name: RandomErasing
+#    params:
+#      p: 0.5  # Execution probability
+#      scale: [0.02, 0.33]  # Erasing area ratio
+#      ratio: [0.3, 3.3]    # Erasing aspect ratio
+#      value: 0             # Erasing fill value 
