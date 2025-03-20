@@ -58,7 +58,7 @@ def parse():
     parser.add_argument('--gpu_num', type=int, default=1, help='Number of GPUs to use')
     parser.add_argument('--num_workers', type=int, default=1, help='Number of workers')
     parser.add_argument('--save_dir', type=str, required=True, help='Directory to save features')
-    parser.add_argument('--patch_slide_dir', type=str, required=True, help='Directory to patches (cropped by slides)')
+    parser.add_argument('--patch_slide_dir', type=str, required=False, help='Directory to patches (cropped by slides)')
     parser.add_argument('--csv_path', type=str, help='Path to CSV file containing slide directories')
     parser.add_argument('--amp', type=str, default='fp32', choices=['fp32', 'fp16', 'bf16'], help='Mixed precision mode (fp32, fp16, bf16)')
     parser.add_argument('--image_loader', type=str, default='jpeg4py', choices=['pil', 'jpeg4py', 'opencv'], help='Image loading method (pil|jpeg4py|opencv)')
