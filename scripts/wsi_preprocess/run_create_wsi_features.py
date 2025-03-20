@@ -64,7 +64,7 @@ def parse():
     parser.add_argument('--patch_slide_dir', type=str, help='Directory to patches (cropped by slides)')
 
     parser.add_argument('--amp', type=str, default='fp32', choices=['fp32', 'fp16', 'bf16'], help='Mixed precision mode (fp32, fp16, bf16)')
-    parser.add_argument('--image_loader', type=str, default='jpeg4py', choices=['pil', 'jpeg4py', 'opencv'], help='Image loading method (pil|jpeg4py|opencv)')
+    parser.add_argument('--image_loader', type=str, default='pil', choices=['pil', 'jpeg4py', 'opencv'], help='Image loading method (pil|jpeg4py|opencv)')
     parser.add_argument('--image_preprocess', type=str, default=None, help='Path to the YAML file containing image preprocessing configurations')
 
     return parser.parse_args()
