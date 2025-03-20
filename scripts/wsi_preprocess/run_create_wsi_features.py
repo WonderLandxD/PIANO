@@ -59,6 +59,7 @@ def parse():
     parser.add_argument('--num_workers', type=int, default=1, help='Number of workers')
     parser.add_argument('--save_dir', type=str, required=True, help='Directory to save features')
     parser.add_argument('--patch_slide_dir', type=str, required=True, help='Directory to patches (cropped by slides)')
+    parser.add_argument('--csv_path', type=str, help='Path to CSV file containing slide directories')
     parser.add_argument('--amp', type=str, default='fp32', choices=['fp32', 'fp16', 'bf16'], help='Mixed precision mode (fp32, fp16, bf16)')
     parser.add_argument('--image_loader', type=str, default='jpeg4py', choices=['pil', 'jpeg4py', 'opencv'], help='Image loading method (pil|jpeg4py|opencv)')
     parser.add_argument('--image_preprocess', type=str, default=None, help='Path to the YAML file containing image preprocessing configurations')
@@ -75,7 +76,12 @@ if __name__ == '__main__':
     args = parse()
     validate_args(args)
 
-    slide_list = glob.glob(f'{args.patch_slide_dir}/*')
+    # Read slide list from CSV if provided, otherwise use glob
+    if args.csv_path and os.path.exists(args.csv_path):
+        with open(args.csv_path, 'r', encoding='utf-8') as f:
+            slide_list = [line.strip() for line in f.readlines()]
+    else:
+        slide_list = glob.glob(f'{args.patch_slide_dir}/*')
     save_dir = Path(args.save_dir)
     pair_list = generate_pair_list(slide_list, save_dir, args.model_name)
 
