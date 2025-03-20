@@ -1,7 +1,7 @@
 transforms:
   - name: Resize
     params:
-      size: [224, 224]  # Resize image to 224x224
+      size: [256, 256]  # Resize image to 256x256
   - name: ToTensor     # Convert image to tensor
   - name: Normalize    # Normalize image
     params:
