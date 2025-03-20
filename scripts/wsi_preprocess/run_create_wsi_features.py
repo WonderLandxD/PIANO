@@ -54,7 +54,7 @@ def parse():
     parser.add_argument('--batch_size', type=int, default=1, help='Batch size for extracting features')
     parser.add_argument('--model_name', type=str, default=None, required=True, help='Pathology foundation model name of feature extractor')
     parser.add_argument('--local_dir', type=bool, default=False, help='Using local directory of feature extractor')
-    parser.add_argument('--ckpt', type=str, default=None, required=True, help='Checkpoint path of feature extractor')
+    parser.add_argument('--ckpt', type=str, default=None, required=False, help='Checkpoint path of feature extractor')
     parser.add_argument('--gpu_num', type=int, default=1, help='Number of GPUs to use')
     parser.add_argument('--num_workers', type=int, default=1, help='Number of workers')
     parser.add_argument('--save_dir', type=str, required=True, help='Directory to save features')
