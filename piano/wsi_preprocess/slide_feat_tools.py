@@ -39,11 +39,10 @@ class FeatureDataset(torch.utils.data.Dataset):
         else:
             image = Image.open(patch_path).convert('RGB')
         
-        # 从文件名中提取坐标信息，格式为 "no{idx:06d}_{x_start:09d}x_{y_start:09d}y.jpg"
+        # "no{idx:06d}_{x_start:09d}x_{y_start:09d}y.jpg"
         filename = os.path.basename(patch_path)
         try:
-            # 使用正则表达式提取x和y坐标
-            match = re.search(r'_(\d+)x_(\d+)y\.jpg$', filename)
+            match = re.search(r'(\d+)x_(\d+)y\.jpg$', filename)
             if match:
                 x_coord = int(match.group(1))
                 y_coord = int(match.group(2))
@@ -142,7 +141,6 @@ def func_feat_ext(args, pair_list, gpu_id):
             feature_box = torch.cat(features, dim=0).cpu()
             coord_box = torch.cat(coordinates, dim=0).cpu()
             
-            # 保存特征和坐标信息
             torch.save({
                 'feats': feature_box,
                 'coords': coord_box
