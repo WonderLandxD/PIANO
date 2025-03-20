@@ -85,7 +85,8 @@ def load_image_preprocess(cfg_path):
 def func_feat_ext(args, pair_list, gpu_id):
     device = torch.device(f"cuda:{gpu_id}")
     model = create_model(args.model_name, args.ckpt, local_dir=args.local_dir)
-    model.set_mode('eval')
+    model.eval()
+    model.to(device)
 
     amp_dtype = {
         'fp32': torch.float32,
