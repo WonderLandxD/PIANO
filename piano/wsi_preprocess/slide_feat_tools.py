@@ -11,12 +11,23 @@ from piano.piano import create_model
 import torchvision
 import yaml
 
+# ANSI color codes for progress bar
+GREEN = '\033[92m'
+BLUE = '\033[94m'
+CYAN = '\033[96m'
+RESET = '\033[0m'
+BOLD = '\033[1m'
+
 try:
     from jpeg4py import JPEG, JPEGRuntimeError
     USE_JPEG4PY = True
 except ImportError:
     from PIL import Image
     USE_JPEG4PY = False
+
+def collate_fn(batch):
+    return (torch.stack([item[0] for item in batch]), 
+            torch.stack([item[1] for item in batch]))
 
 class FeatureDataset(torch.utils.data.Dataset):
     def __init__(self, slide_path, image_preprocess, image_loader='pil'):
@@ -96,40 +107,52 @@ def func_feat_ext(args, pair_list, gpu_id):
 
     image_preprocess = load_image_preprocess(args.image_preprocess)
 
+    # Get process ID for progress bar positioning
+    process_id = os.getpid()
+    
+    # Function to clear progress bar line
+    def clear_pbar_line(position):
+        print(f"\033[{position+1}A\033[K", end="")
+
     for item, pair_path in enumerate(pair_list):
-        slide_path = pair_path[0]
-        feat_path = pair_path[1]
+        pbar = None
+        try:
+            slide_path = pair_path[0]
+            feat_path = pair_path[1]
 
-        process_dataset = FeatureDataset(
-            slide_path=slide_path,
-            image_preprocess=image_preprocess,
-            image_loader=args.image_loader
-        )
-        data_loader = torch.utils.data.DataLoader(
-            process_dataset, 
-            batch_size=args.batch_size,
-            shuffle=False,
-            num_workers=args.num_workers,
-            pin_memory=True,
-            persistent_workers=True,
-            prefetch_factor=2,
-            drop_last=False,
-            collate_fn=lambda batch: (torch.stack([item[0] for item in batch]), 
-                                      torch.stack([item[1] for item in batch]))
-        )
+            process_dataset = FeatureDataset(
+                slide_path=slide_path,
+                image_preprocess=image_preprocess,
+                image_loader=args.image_loader
+            )
+            data_loader = torch.utils.data.DataLoader(
+                process_dataset, 
+                batch_size=args.batch_size,
+                shuffle=False,
+                num_workers=args.num_workers,
+                pin_memory=True,
+                persistent_workers=True,
+                prefetch_factor=2,
+                drop_last=False,
+                collate_fn=collate_fn
+            )
 
-        os.makedirs(os.path.dirname(feat_path), exist_ok=True)
+            os.makedirs(os.path.dirname(feat_path), exist_ok=True)
 
-        with torch.inference_mode():
-            features = []
-            coordinates = []
-            with tqdm(total=len(process_dataset), 
-                     desc=f'GPU{gpu_id} Slide{item+1}/{len(pair_list)}',
-                     position=gpu_id, 
-                     ncols=90, 
-                     leave=False) as pbar:
+            with torch.inference_mode():
+                features = []
+                coordinates = []
+                pbar = tqdm(total=len(process_dataset), 
+                          desc=f'{BOLD}Process {process_id} | GPU {gpu_id} | {item+1}/{len(pair_list)}{RESET}',
+                          position=process_id % args.num_processes,
+                          ncols=130,
+                          leave=False,  # Changed to False to prevent stacking
+                          bar_format='{desc:<45}{percentage:3.0f}%|{bar:20}|{n_fmt:>6}/{total_fmt:<6}[{elapsed}<{remaining}]{postfix}',
+                          colour='blue')
                 
                 slide_id = os.path.basename(slide_path)[:12]
+                pbar.set_postfix_str(f"ID:{slide_id}")
+                
                 for batch_img, batch_coord in data_loader:
                     batch_img = batch_img.to(device, non_blocking=True)
                     with torch.autocast(device_type='cuda', dtype=amp_dtype):
@@ -137,12 +160,22 @@ def func_feat_ext(args, pair_list, gpu_id):
                     features.append(patch_feat.float())
                     coordinates.append(batch_coord)
                     pbar.update(len(batch_img))
-                    pbar.set_postfix_str(f"ID:{slide_id}")
 
-            feature_box = torch.cat(features, dim=0).cpu()
-            coord_box = torch.cat(coordinates, dim=0).cpu()
-            
-            torch.save({
-                'feats': feature_box,
-                'coords': coord_box
-            }, feat_path)
+                feature_box = torch.cat(features, dim=0).cpu()
+                coord_box = torch.cat(coordinates, dim=0).cpu()
+                
+                torch.save({
+                    'feats': feature_box,
+                    'coords': coord_box
+                }, feat_path)
+                
+        except Exception as e:
+            # Log error and continue to next slide
+            print(f"Error in slide {os.path.basename(slide_path)}: {str(e)}")
+        finally:
+            # Clean up progress bar
+            if pbar is not None:
+                pbar.close()
+                clear_pbar_line(process_id % args.num_processes)
+
+    return True
