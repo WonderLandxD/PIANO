@@ -343,8 +343,6 @@ class Virchow2Model(BaseModel):
 
         self.image_preprocess = preprocess
         self.output_dim = 2560
-        
-        super().__init__(checkpoint_path)
     
     def forward(self, x):
         with torch.set_grad_enabled(self.backbone.training):
