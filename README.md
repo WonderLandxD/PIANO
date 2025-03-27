@@ -177,6 +177,7 @@ print("Label probs:", probs)
 | `musk`                   | `hf_hub:xiangjx/musk`              | [Hugging Face - xiangjx/musk](https://huggingface.co/xiangjx/musk) |
 | `h_optimus_0`            | `hf-hub:bioptimus/H-optimus-0`     | [Hugging Face - bioptimus/H-optimus-0](https://huggingface.co/bioptimus/H-optimus-0) |
 | `h_optimus_1`            | `hf-hub:bioptimus/H-optimus-1`     | [Hugging Face - bioptimus/H-optimus-1](https://huggingface.co/bioptimus/H-optimus-1) |
+| `phikon_v2`            | `owkin/phikon-v2`     | [Hugging Face - owkin/phikon-v2](https://huggingface.co/owkin/phikon-v2) |
 | `ctranspath`             | `YOUR_LOCAL_PATH`                  | --- |
 
 **Note**: `local_dir` means the path to your local model files downloaded from the official source.
