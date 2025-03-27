@@ -332,6 +332,7 @@ class VirchowModel(BaseModel):
 @register_model('virchow_v2')
 class Virchow2Model(BaseModel):
     def __init__(self, checkpoint_path=None, local_dir=False):
+        super().__init__()
         if local_dir == True and checkpoint_path is not None:
             raise NotImplementedError("Local directory not supported for Virchow2 model")
         else:
