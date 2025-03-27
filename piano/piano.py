@@ -29,7 +29,7 @@ MODEL_HF_PATHS = {
     "virchow_v2": "hf-hub:paige-ai/Virchow2",
     "musk": "hf_hub:xiangjx/musk",
     "h_optimus_0": "hf-hub:bioptimus/H-optimus-0",
-    "h_optimus_1": "bioptimus/H-optimus-1",
+    "h_optimus_1": "hf-hub:bioptimus/H-optimus-1",
     "ctranspath": "YOUR_LOCAL_PATH",
 }
 
