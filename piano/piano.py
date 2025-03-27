@@ -14,7 +14,7 @@ import timm
 from timm.data import resolve_data_config
 from timm.data.transforms_factory import create_transform
 
-
+from transformers import AutoImageProcessor, AutoModel
 
 
 
@@ -30,6 +30,7 @@ MODEL_HF_PATHS = {
     "musk": "hf_hub:xiangjx/musk",
     "h_optimus_0": "hf-hub:bioptimus/H-optimus-0",
     "h_optimus_1": "hf-hub:bioptimus/H-optimus-1",
+    "phikon_v2": "owkin/phikon-v2",
     "ctranspath": "YOUR_LOCAL_PATH",
 }
 
@@ -504,6 +505,40 @@ class HOptimus1Model(BaseModel):
         patch_token = output[:, 5:]
         class_token = output[:, 0]
         return {"patch_tokens": patch_token, "class_token": class_token}
+    
+
+@register_model('phikon_v2')
+class PhikonV2Model(BaseModel):
+    def __init__(self, checkpoint_path=None, local_dir=False):
+        super().__init__()
+        if local_dir == True and checkpoint_path is not None:
+            raise NotImplementedError("Local directory not supported for phikon_v2 model")
+        else:
+            checkpoint_path = get_model_hf_path('phikon_v2')
+
+        self.backbone = AutoModel.from_pretrained(checkpoint_path)
+        self.preprocess = AutoImageProcessor.from_pretrained(checkpoint_path)
+
+        def phikonprocessor(image):
+            output = self.preprocess(image, return_tensor="pt")
+            return torch.from_numpy(output['pixel_values'][0])
+        
+        self.image_preprocess = phikonprocessor
+        self.output_dim = 1024
+
+
+    def forward(self, x):
+        with torch.set_grad_enabled(self.backbone.training):
+            outputs = self.backbone(x)
+            outputs = outputs.last_hidden_state[:, 0, :]
+        return outputs
+
+    def get_img_token(self, x):
+        output = self.backbone(x)
+        patch_token = output.last_hidden_state[:, 1:]
+        class_token = output.last_hidden_state[:, 0]
+        return {"patch_tokens": patch_token, "class_token": class_token}
+
 
 
 def to_2tuple(x):

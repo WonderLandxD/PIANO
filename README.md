@@ -131,7 +131,7 @@ text_labels = ["lung adenocarcinoma", "lung squamous cell carcinoma", "normal"] 
 
 # 3. Use the model's preprocessing functions to process the image and text
 image_tensor = image_preprocess(image).unsqueeze(0).cuda()  # [1, 3, 256, 256]
-text_tensors = text_preprocess(text_labels).unsqueeze(0).cuda()  # Each label [3, 77]
+text_tensors = text_preprocess(text_labels).cuda()  # Each label [3, 77]
 
 # 4. Extract features
 model.eval()
