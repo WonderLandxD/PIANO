@@ -441,7 +441,7 @@ class MuskModel(BaseModel):
         return {"patch_tokens": patch_token, "class_token": class_token}
 
 @register_model('h_optimus_0')
-class HOptimusModel(BaseModel):
+class HOptimus0Model(BaseModel):
     def __init__(self, checkpoint_path=None, local_dir=False):
         super().__init__()
         if local_dir == True and checkpoint_path is not None:
@@ -474,7 +474,7 @@ class HOptimusModel(BaseModel):
     
 
 @register_model('h_optimus_1')
-class HOptimusModel(BaseModel):
+class HOptimus1Model(BaseModel):
     def __init__(self, checkpoint_path=None, local_dir=False):
         super().__init__()
         if local_dir == True and checkpoint_path is not None:
