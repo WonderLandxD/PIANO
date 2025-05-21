@@ -10,13 +10,17 @@
 
 •	🧠 **Foundation models**: Use pretrained pathology foundation models to extract powerful features.
 
-• 🚇 **Fine-tuning patch-level tasks**: Lightweight code to fine-tune foundation models for patch-level classification.
+•   🚇 **Fine-tuning patch-level tasks**: Lightweight code to fine-tune foundation models for patch-level classification.
+
+•   🚝 **Fine-tuning slide-level tasks**: Lightweight code to fine-tune foundation models for slide-level classification.
 
 •	🌍 More functionality will be released in the future.
 
 ---------
 
 ## 📰 News
+
+**2025-05-20:** Added fine-tuning codes for slide-level classification tasks. Optimized some codes and README.md. 
 
 **2025-03-19:** Added fine-tuning codes for patch-level classification tasks. Optimized some codes. 
 
@@ -39,55 +43,70 @@ pip install -e .
 
 ## 📚 Usage
 
-### 🪐 *1. Generating patches from histopathology whole slide images (WSIs).*
-To batch-generate patches for WSIs, we first run the command `scripts/wsi_preprocess/run_generate_wsi_list.py` as follows:
-
-```bash
-cd scripts/wsi_preprocess
-
-python run_generate_wsi_list.py --data_folder <Root_directory_path_containing_WSI_files> --dataset_name <Dataset_name> --save_dir <Directory_to_save_CSV_file>
-```
-
-Then run the command `scripts/wsi_preprocess/run_generate_patches.py` as follows. We recommend using **8** processes since it works on regular CPU:
-
-```bash
-python run_generate_patches.py --n_thread 8 --csv_path <Path_to_the_CSV_file> --save_dir <Directory_to_save_patches>
-```
-
-### 🌕 *2. Define a pretrained pathology foundation model.*
-
+### 🌕 *Define a pretrained pathology foundation model*
 We use [PLIP](https://www.nature.com/articles/s41591-023-02504-3) as an example.
 
-First download the pretrained weights.
+***STEP 1 - Set up Hugging Face***
+
 ```bash
-# Set up Hugging Face mirror (if you encounter issues downloading models)
-export HF_ENDPOINT='https://hf-mirror.com'
+# Change the default path of HuggingFace cache directory
+mkdir YOUR_PATH_TO_SAVE_HUGGINGFACE_CACHE
 
-# Log in to Hugging Face (replace with your write token)
-huggingface-cli login --token <huggingface_write_token>
+# Open the ~/.bashrc file
+vim ~/.bashrc
 
-# Download the model and customize the path
-# Set the model name and custom path
-export MODEL_NAME='vinid/plip'
-export CUSTOM_PATH='<your_custom_path>'
+# Add the following command to ~/.bashrc in the last line
+export HF_HOME='YOUR_PATH_TO_SAVE_HUGGINGFACE_CACHE'
 
-# Use huggingface-cli to download the model to the custom path
-huggingface-cli download $MODEL_NAME --cache-dir $CUSTOM_PATH
+# (Optional) Add the HuggingFace mirror if you encounter issues downloading models
+# export HF_ENDPOINT='https://hf-mirror.com'
+
+# Apply the changes
+source ~/.bashrc
 ```
 
-Then define the model in Python.
+You can see if the HuggingFace cache directory is set up correctly by running the following command:
+```bash
+env | grep HF_HOME
+```
+
+***STEP 2 - Download the pretrained weights***
+```bash
+# Some models are accessible after you accept the conditions. You need first to click the "Agree and access repository" button and then create a Hugging Face write token to download the weights.
+
+# Log in to Hugging Face (replace with your write token)
+huggingface-cli login --token HUGGINGFACE_WRITE_TOKEN
+
+# Set the model name and download the model
+export MODEL_NAME='vinid/plip'
+huggingface-cli download $MODEL_NAME
+```
+
+***STEP 3 - Review all the model name and their path***
+```bash
+# Install the huggingface_hub
+pip install huggingface_hub
+
+# Scan the cache directory
+huggingface-cli scan-cache
+
+# (Optional) If you want to delete the cache directory, you can run the following command:
+huggingface-cli delete-cache
+```
+
+***STEP 4 - Define the model in Python (PLIP model as an example)***
 
 ```python
 # Load the PLIP model from Hugging Face
-from piano import create_model
-model = create_model("plip").cuda()
-# Note: Some models may not be defined from hugging face.
+import piano
+model = piano.create_model(model_name="plip").cuda()
 ```
+
+> **Note:** Some models may not be defined from hugging face. You need to turn on the local_dir as True, which can be done by the following code:
 
 ```python
 # Load the PLIP model from local path
-model = create_model("plip", checkpoint_path="<your_custom_path>", local_dir=True).cuda()
-# Note: some models may not be defined from local path.
+model = piano.create_model(model_name="plip", local_dir=True, checkpoint_path="YOUR_LOCAL_PATH_TO_MODEL_CHECKPOINT").cuda()
 ```
 
 ```python
@@ -164,50 +183,309 @@ print("Label probs:", probs)
 - `piano.get_model_hf_path(model_name)`: Returns the Hugging Face model path for a given model name. This is useful if you want to load a model checkpoint from Hugging Face.
 
 ### Model Checkpoint Paths and Sources
-| **Model Name**           | **Model Checkpoint Path**          | **Link for `piano.get_model_hf_path(model_name)`**                             |
-|--------------------------|------------------------------------|-----------------------------------------------------------------------------------|
-| `plip`                   | `vinid/plip`                       | [Hugging Face - vinid/plip](https://huggingface.co/vinid/plip)                    |
-| `openai_clip_p16`        | `openai/clip-vit-base-patch16`     | [Hugging Face - openai/clip-vit-base-patch16](https://huggingface.co/openai/clip-vit-base-patch16) |
-| `conch_v1`               | `hf_hub:MahmoodLab/conch`          | [Hugging Face - MahmoodLab/CONCH](https://huggingface.co/MahmoodLab/CONCH) |
-| `uni_v1`                 | `hf-hub:MahmoodLab/uni`            | [Hugging Face - MahmoodLab/UNI](https://huggingface.co/MahmoodLab/UNI) |
-| `uni_v2`                 | `hf-hub:MahmoodLab/UNI2-h`         | [Hugging Face - MahmoodLab/UNI2-h](https://huggingface.co/MahmoodLab/UNI2-h) |
-| `prov_gigapath`          | `hf_hub:prov-gigapath/prov-gigapath` | [Hugging Face - prov-gigapath/prov-gigapath](https://huggingface.co/prov-gigapath/prov-gigapath) |
-| `virchow_v1`             | `hf-hub:paige-ai/Virchow`          | [Hugging Face - paige-ai/Virchow](https://huggingface.co/paige-ai/Virchow) |
-| `virchow_v2`             | `hf-hub:paige-ai/Virchow2`         | [Hugging Face - paige-ai/Virchow2](https://huggingface.co/paige-ai/Virchow2) |
-| `musk`                   | `hf_hub:xiangjx/musk`              | [Hugging Face - xiangjx/musk](https://huggingface.co/xiangjx/musk) |
-| `h_optimus_0`            | `hf-hub:bioptimus/H-optimus-0`     | [Hugging Face - bioptimus/H-optimus-0](https://huggingface.co/bioptimus/H-optimus-0) |
-| `h_optimus_1`            | `hf-hub:bioptimus/H-optimus-1`     | [Hugging Face - bioptimus/H-optimus-1](https://huggingface.co/bioptimus/H-optimus-1) |
-| `phikon_v2`            | `owkin/phikon-v2`     | [Hugging Face - owkin/phikon-v2](https://huggingface.co/owkin/phikon-v2) |
-| `ctranspath`             | `YOUR_LOCAL_PATH`                  | --- |
+| **Model Name**           | **Output Dimension** | **Model Checkpoint Path**          | **Model Weight Link** | **Paper/Codebase/Website Link** |
+|--------------------------|----------------------|------------------------------------|-----------------------------------------------------------------------------------|--------------|
+| `plip`                   | 512                  | `vinid/plip`                       | [Hugging Face - vinid/plip](https://huggingface.co/vinid/plip)                    | [A visual–language foundation model for pathology image analysis using medical Twitter](https://www.nature.com/articles/s41591-023-02504-3) |
+| `openai_clip_p16`        | 512                  | `openai/clip-vit-base-patch16`     | [Hugging Face - openai/clip-vit-base-patch16](https://huggingface.co/openai/clip-vit-base-patch16) | [Learning transferable visual models from natural language supervision](https://proceedings.mlr.press/v139/radford21a) |
+| `conch_v1`               | 512                  | `hf_hub:MahmoodLab/conch`          | [Hugging Face - MahmoodLab/CONCH](https://huggingface.co/MahmoodLab/CONCH) | [A visual-language foundation model for computational pathology](https://www.nature.com/articles/s41591-024-02856-4) |
+| `uni_v1`                 | 1024                 | `hf-hub:MahmoodLab/uni`            | [Hugging Face - MahmoodLab/UNI](https://huggingface.co/MahmoodLab/UNI) | [Towards a general-purpose foundation model for computational pathology](https://www.nature.com/articles/s41591-024-02857-3) |
+| `uni_v2`                 | 1536                 | `hf-hub:MahmoodLab/UNI2-h`         | [Hugging Face - MahmoodLab/UNI2-h](https://huggingface.co/MahmoodLab/UNI2-h) | [Github Page from *github.com/mahmoodlab/UNI*](https://github.com/mahmoodlab/UNI) |
+| `prov_gigapath`          | 1536                 | `hf_hub:prov-gigapath/prov-gigapath` | [Hugging Face - prov-gigapath/prov-gigapath](https://huggingface.co/prov-gigapath/prov-gigapath) | [A whole-slide foundation model for digital pathology from real-world data](https://www.nature.com/articles/s41586-024-07441-w) |
+| `virchow_v1`             | 2560                 | `hf-hub:paige-ai/Virchow`          | [Hugging Face - paige-ai/Virchow](https://huggingface.co/paige-ai/Virchow) | [A foundation model for clinical-grade computational pathology and rare cancers detection](https://www.nature.com/articles/s41591-024-03141-0) |
+| `virchow_v2`             | 2560                 | `hf-hub:paige-ai/Virchow2`         | [Hugging Face - paige-ai/Virchow2](https://huggingface.co/paige-ai/Virchow2) | [Virchow2: scaling self-supervised mixed magnification models in pathology](https://arxiv.org/pdf/2408.00738) |
+| `musk`                   | 2048                 | `hf_hub:xiangjx/musk`              | [Hugging Face - xiangjx/musk](https://huggingface.co/xiangjx/musk) | [A vision–language foundation model for precision oncology](https://www.nature.com/articles/s41586-024-08378-w) |
+| `h_optimus_0`            | 1536                 | `hf-hub:bioptimus/H-optimus-0`     | [Hugging Face - bioptimus/H-optimus-0](https://huggingface.co/bioptimus/H-optimus-0) | [H-Optimus-0: An open-source foundation model for histology.](https://github.com/bioptimus/releases/tree/main/models/h-optimus/v0) |
+| `h_optimus_1`            | 1536                 | `hf-hub:bioptimus/H-optimus-1`     | [Hugging Face - bioptimus/H-optimus-1](https://huggingface.co/bioptimus/H-optimus-1) | [H-Optimus-1: The leading foundation model for histology](https://www.bioptimus.com/h-optimus-1#section1) |
+| `phikon_v2`              | 768                  | `owkin/phikon-v2`                  | [Hugging Face - owkin/phikon-v2](https://huggingface.co/owkin/phikon-v2) | [Phikon-v2, a large and public feature extractor for biomarker prediction](https://arxiv.org/abs/2409.09173) |
+| `ctranspath*`            | 768                  | `YOUR_LOCAL_PATH`                  | [Github - Xiyue-Wang/TransPath](https://github.com/Xiyue-Wang/TransPath) | [Transformer-based unsupervised contrastive learning for histopathological image classification](https://www.sciencedirect.com/science/article/abs/pii/S1361841522002043) |
 
-**Note**: `local_dir` means the path to your local model files downloaded from the official source.
+**Note**: `*` means the model is not available on Hugging Face. You need to download the model checkpoint from the official source and load it using the `local_dir` parameter.
 
 *More models will be supported (Updated on 03-18-2025).*
 
-### 🌞 *3. Using pathology foundation models to create patch features.*
+### 🪐 *Generating patches and extracting patch-level features from histopathology WSIs.*
+
+---
+
+***STEP 1 - Generate a CSV file containing the list of WSIs.***
+
+We first run the command `scripts/wsi_preprocess/1_run_generate_wsi_list.py` as follows:
+
+```bash
+cd scripts/wsi_preprocess
+
+python 1_run_generate_wsi_list.py --data_folder ROOT_DIRECTORY_PATH_CONTAINING_WSI_FILES --dataset_name DATASET_NAME --save_dir ../WSI_DATA/wsi_list_csv
+```
+
+> **--data_folder ROOT_DIRECTORY_PATH_CONTAINING_WSI_FILES** is the path where the script will recursively search for all WSI files with extensions '.svs', '.sdpc', '.tiff', '.tif', '.ndpi'. The script will find all matching files in this directory and its subdirectories. 
+
+> **--dataset_name DATASET_NAME** is your custom name for the dataset, which will be used in the output CSV filename.
+
+> **--save_dir YOUR_DIRECTORY_TO_SAVE_CSV_FILE** is the directory where the CSV file containing the list of WSI files will be saved. (Default: `../WSI_DATA/wsi_list_csv`)
+
+ ```bash
+# You can customize the file types to search for using the `--additional_file_types` parameter. For example, to include `.mrxs` files in addition to the default extensions:
+
+cd scripts/wsi_preprocess
+
+python 1_run_generate_wsi_list.py --data_folder ROOT_DIRECTORY_PATH_CONTAINING_WSI_FILES --dataset_name DATASET_NAME --save_dir DIRECTORY_TO_SAVE_CSV_FILE --additional_file_types .mrxs
+ ```
+
+---
+***STEP 2 - Generate patches from all WSIs in the CSV file.***
+
+Next, run the command `scripts/wsi_preprocess/2_run_generate_patches.py` as follows. We recommend using **--n_thread 8** (8 processes) since it works on regular CPU:
+
+```bash
+cd scripts/wsi_preprocess
+
+python 2_run_generate_patches.py --n_thread 8 --csv_path PATH_TO_CSV_FILE --save_dir DIRECTORY_TO_SAVE_PATCHES
+```
+
+> **--csv_path PATH_TO_CSV_FILE** is the path to the CSV file containing the list of WSI files. (File from step 1)
+
+> **--save_dir DIRECTORY_TO_SAVE_PATCHES** is the directory where the patches will be saved. The script will create a subdirectory with the same name as the CSV file, and within it, create a directory structure for each slide as follows:
 
 ```
-python run_create_features.py \
-    --batch_size 1 \
-    --model_name choose_one_foundation_model \
-    --ckpt model_weight_path \
-    --gpu_num 1 \
-    --save_dir save_directory \
-    --patch_slide_dir patches_derectory \
-    --image_preprocess ../transform_configs/create_patch_feats_transforms.yaml
+DIRECTORY_TO_SAVE_PATCHES/
+	CSV_FILE_NAME_{DATE}/
+		├── slide_1
+    			├── no000000_{coordinate x_0}x_{coordinate y_0}y.jpg
+    			├── no000001_{coordinate x_1}x_{coordinate y_1}y.jpg
+                ├── ...
+                ├── no00000m_{coordinate x_m}x_{coordinate y_m}y.jpg
+    			└── thumbnail/
+                      └── x20_thumbnail.jpg
+		├──slide_2
+    			├── no000000_{coordinate x_0}x_{coordinate y_0}y.jpg
+    			├── no000001_{coordinate x_1}x_{coordinate y_1}y.jpg
+                ├── ...
+                ├── no00000m_{coordinate x_m}x_{coordinate y_m}y.jpg
+    			└── thumbnail/
+                      └── x20_thumbnail.jpg
+        ...
+		└── slide_N
+    			├── no000000_{coordinate x_0}x_{coordinate y_0}y.jpg
+    			├── no000001_{coordinate x_1}x_{coordinate y_1}y.jpg
+                ├── ...
+                ├── no00000m_{coordinate x_m}x_{coordinate y_m}y.jpg
+    			└── thumbnail/
+                      └── x20_thumbnail.jpg
+└── ...
 ```
 
-- **batch_size:** (int) Batch size for feature extraction. Default is 1.
-- **model_name:** (str) The name of the pathology foundation model to use for feature extraction (e.g., "plip", "openai_clip_p16"). This is a required argument.
-- **ckpt:** (str) Path to the checkpoint file for the chosen model. This is a required argument.
-- **gpu_num:** (int) The number of GPUs to use. Default is 1.
-- **num_workers:** (int) Number of workers for loading data. Default is 1.
-- **save_dir:** (str) Directory where the extracted features will be saved. This is a required argument.
-- **patch_slide_dir:** (str) Directory containing the patches (cropped from slides). This is a required argument.
-- **image_preprocess:** (str) Path to the YAML file containing image preprocessing configurations.
+**Example from the CPTAC Lung cohort:**
+```
+DIRECTORY_TO_SAVE_PATCHES/
+	CPTAC-LUAD_2025-05-19/
+		├── C3L-04365-28
+    			├── no000000_000003072x_000006144y.jpg
+    			├── no000001_000003072x_000009216y.jpg
+    			├── no000002_000006144x_000003072y.jpg
+    			├── no000003_000006144x_000006144y.jpg
+    			├── no000004_000006144x_000009216y.jpg
+    			├── no000005_000009216x_000003072y.jpg
+    			├── no000006_000009216x_000006144y.jpg
+    			├── no000007_000009216x_000009216y.jpg
+    			├── no000008_000012288x_000003072y.jpg
+    			├── no000009_000012288x_000006144y.jpg
+    			├── no000010_000015360x_000006144y.jpg
+    			├── no000011_000018432x_000006144y.jpg
+    			└── thumbnail/
+                      └── x20_thumbnail.jpg
+        └── ...
+```
 
-### ⭐ *4. Fine-tuning patch-level tasks.*
-Coming soon!
+---
+
+***STEP 3 - Extract patch-level features from a patch directory or a csv file containing the list of patch directories.***
+
+**Choice 1 - For extracting patch-level features from a csv file containing the list of patch directories**, you can run the command `scripts/wsi_preprocess/3_run_create_patchdir_list.py` first to generate a csv file containing the list of patch directories as follows:
+
+```bash
+cd scripts/wsi_preprocess
+
+python 3_run_create_patchdir_list.py --data_folder ROOT_DIRECTORY_PATH_CONTAINING_PATCHES_FILES --dataset_name DATASET_NAME --save_dir DIRECTORY_TO_SAVE_PATCH_DIR_LIST_CSV_FILE
+```
+
+> **--data_folder ROOT_DIRECTORY_PATH_CONTAINING_PATCHES_FILES** is the root directory path where the script will recursively search for folders containing `thumbnail/x20_thumbnail.jpg` files. This thumbnail file is generated as the final step after all patches have been extracted from a WSI. The script identifies valid patch directories by checking for the presence of this thumbnail file, and adds these directories to the list for further processing.
+
+> **--dataset_name DATASET_NAME** is your custom name for the dataset, which will be used in the output CSV filename.
+
+> **--save_dir DIRECTORY_TO_SAVE_PATCH_DIR_LIST_CSV_FILE** is the directory where the CSV file containing the list of patch directories will be saved.
+
+. Then, you can run the command `scripts/wsi_preprocess/4_run_create_wsi_features.py` as follows:
+
+```bash
+cd scripts/wsi_preprocess
+
+python 4_run_create_wsi_features.py --batch_size BArTCH_SIZE --model_name FOUNDATION_MODEL_NAME --local_dir False --ckpt model_weight_path --gpu_ids GPU_ID_1 GPU_ID_2 ... --num_processes NUM_PROCESSES --save_dir save_directory --csv_path CSV_FILE_PATH --amp AMP_TYPE --image_loader IMAGE_LOADER_TYPE --image_preprocess PATH_TO_YAML_FILE
+```
+
+> **--batch_size BATCH_SIZE** is the batch size for feature extraction.
+
+> **--model_name FOUNDATION_MODEL_NAME** is the name from pathology foundation model list.
+
+> **--local_dir False** is a boolean flag to indicate whether the model checkpoint is located in a local directory.
+
+> **--ckpt model_weight_path** is the path to the model checkpoint file. (required if --local_dir is True)
+
+> **--gpu_ids GPU_ID_1 GPU_ID_2 ...** is the list of GPU IDs to use for feature extraction.
+
+> **--num_processes NUM_PROCESSES** is the number of processes to use for feature extraction.
+
+> **--save_dir save_directory** is the directory where the extracted features will be saved.
+
+> **--csv_path CSV_FILE_PATH** is the path to the CSV file containing the list of patch directories.
+
+> **--amp AMP_TYPE** is the type of AMP (Automatic Mixed Precision) to use for feature extraction. (Choices: fp32, fp16, bf16)
+
+> **--image_loader IMAGE_LOADER_TYPE** is the type of image loader. (Choices: pil, jpeg4py, opencv)
+
+> **--image_preprocess PATH_TO_YAML_FILE** is the path to the YAML file containing image preprocessing configurations. (We provide a default YAML file from `transform_configs/create_patch_feats_transforms.yaml`)
+
+**Example using PLIP model to run the Camelyon+ Dataset in 8 * NVIDIA A100 GPUs with 16 processes:**
+
+```bash
+cd scripts/wsi_preprocess
+
+python 4_run_create_wsi_features.py --batch_size 1 --model_name plip --local_dir False --gpu_ids 0 1 2 3 4 5 6 7 --num_processes 16 --save_dir ../WSI_DATA/patch_feature_datasets/CamelyonPlus --csv_path ../WSI_DATA/patchdir_list_csv/CamelyonPlus_2025-05-19.csv --amp fp16 --image_loader pil --image_preprocess ../transform_configs/create_patch_feats_transforms.yaml
+```
+
+**Choice 2 - For extracting patch-level features from a patch directory**, you can run the command `scripts/wsi_preprocess/4_run_create_patch_features.py` directly as follows:
+
+```bash
+cd scripts/wsi_preprocess
+
+python 4_run_create_patch_features.py --batch_size BATCH_SIZE --model_name FOUNDATION_MODEL_NAME --local_dir False --ckpt model_weight_path --gpu_ids GPU_ID_1 GPU_ID_2 ... --num_processes NUM_PROCESSES --save_dir save_directory --patch_slide_dir PATH_TO_PATCH_DIRECTORY --amp AMP_TYPE --image_loader IMAGE_LOADER_TYPE --image_preprocess PATH_TO_YAML_FILE
+```
+
+> **--patch_slide_dir PATH_TO_PATCH_DIRECTORY** is the path to the patch directory. We provide an example for PATH_TO_PATCH_DIRECTORY as follows:
+
+> ```
+>PATH_TO_PATCH_DIRECTORY/
+>	slide_1/
+>		no000000_000003072x_000006144y.jpg
+>		no000001_000003072x_000009216y.jpg
+>		...
+>		thumbnail/
+>			x20_thumbnail.jpg
+>	slide_2/
+>		no000000_000003072x_000006144y.jpg
+>		no000001_000003072x_000009216y.jpg
+>		...
+>		thumbnail/
+>			x20_thumbnail.jpg
+>	...
+> ```
+
+
+
+### 🌞 *3. Fine-tuning patch-level tasks*
+Will be released on the last week on May 2025! (Linear Probing, Full Parameter, PathFiT, etc.)
+
+### ⭐ *4. Fine-tuning slide-level (WSI) tasks.*
+
+First we need to generate `json` file for the slide-level downstream tasks. The json file should be in the following format:
+
+```json
+{
+	"train": [
+		{
+			"feat_path": "slide_1.pth",
+			"label": "label_1",
+			"patch_dir": "PATH_TO_PATCH_DIRECTORY/slide_1"
+		},
+		{
+			"feat_path": "slide_2.pth",
+			"label": "label_2",
+			"patch_dir": "PATH_TO_PATCH_DIRECTORY/slide_2"
+		},
+		{
+			"feat_path": "slide_3.pth",
+			"label": "label_3",
+			"patch_dir": "PATH_TO_PATCH_DIRECTORY/slide_3"
+		}
+		...
+	],
+	"valid": [
+		{
+			"feat_path": "slide_4.pth",
+			"label": "label_4",
+			"patch_dir": "PATH_TO_PATCH_DIRECTORY/slide_4"
+		}
+		...
+	],
+	"test": [
+		{
+			"feat_path": "slide_5.pth",
+			"label": "label_5",
+			"patch_dir": "PATH_TO_PATCH_DIRECTORY/slide_5"
+		}
+		...
+	]
+}
+```
+Then, we can run the command `scripts/wsi_classification/run_wsi_train.py` to fine-tune the slide-level downstream tasks.
+
+```bash
+cd scripts/wsi_classification
+
+python run_wsi_train.py --data_json PATH_TO_JSON_FILE --model_name FOUNDATION_MODEL_NAME --training_mode MIL_BASELINE_METHOD --batch_size 1 --num_epochs 15 --lr 1e-4 --weight_decay 1e-4 --seed 42 --amp_dtype bfloat16 --save_metric bal_accuracy --save_interval 5 --save_dir DIRECTORY_TO_SAVE_MODEL --gpu_ids GPU_ID --few_shot FEW_SHOT_NUMBER
+```
+
+> **--data_json PATH_TO_JSON_FILE** is the path to the json file containing the list of `feat_path`, `label`, and `patch_dir` (optional).
+
+> **--model_name FOUNDATION_MODEL_NAME** is the name from pathology foundation model list.
+
+> **--training_mode MIL_BASELINE_METHOD** is the multiple instance learning (MIL) baseline method to use for the slide-level downstream tasks. (Choices: abmil, simlp)
+
+> **--batch_size BATCH_SIZE** is the batch size for training. For all the baseline methods, we recommend using batch size 1.
+
+> **--num_epochs NUM_EPOCHS** is the number of epochs to train. Default: 15.
+
+> **--lr LEARNING_RATE** is the learning rate for training. Default: 1e-4.
+
+> **--weight_decay WEIGHT_DECAY** is the weight decay for training. Default: 1e-4.
+
+> **--seed SEED** is the seed for training. Default: 42.
+
+> **--amp_dtype AMP_TYPE** is the type of AMP (Automatic Mixed Precision) to use for training. (Choices: float32, float16, bfloat16). Default: bfloat16.
+
+> **--save_metric BAL_ACCURACY** is the metric to save the model. (Choices: bal_accuracy, accuracy, auc, f1, kappa). Default: bal_accuracy.
+
+> **--save_interval SAVE_INTERVAL** is the interval to save the model. Default: 5.
+
+> **--save_dir DIRECTORY_TO_SAVE_MODEL** is the directory to save the model. 
+
+> **--gpu_ids GPU_ID** is the GPU ID to use for training.
+
+> **--few_shot FEW_SHOT_NUMBER** is the number of few-shot samples to use for training. Default: None. If provided, the model will be trained with the few-shot samples.
+
+
+After training, we can run the command `scripts/wsi_classification/run_wsi_infer.py` to test the model.
+
+```bash
+cd scripts/wsi_classification
+
+python run_wsi_infer.py --test_json PATH_TO_JSON_FILE --model_name FOUNDATION_MODEL_NAME --training_mode MIL_BASELINE_METHOD --finetune_ckpt PATH_TO_SAVE_MODEL_CHECKPOINT --gpu_ids GPU_ID --output_dir DIRECTORY_TO_SAVE_INFERENCE_RESULT --plot_confusion True
+```
+
+> **--test_json PATH_TO_JSON_FILE** is the path to the json file containing the list of `feat_path`, `label`, and `patch_dir` (optional).
+
+> **--model_name FOUNDATION_MODEL_NAME** is the name from pathology foundation model list.
+
+> **--training_mode MIL_BASELINE_METHOD** is the multiple instance learning (MIL) baseline method to use for the slide-level downstream tasks. (Choices: abmil, simlp)
+
+> **--finetune_ckpt PATH_TO_SAVE_MODEL_CHECKPOINT** is the path to the saved model checkpoint file. Our pipeline will only save the checkpoint of model classifier head, which is lightweight and can be loaded quickly.
+
+> **--gpu_ids GPU_ID** is the GPU ID to use for inference.
+
+> **--output_dir DIRECTORY_TO_SAVE_INFERENCE_RESULT** is the directory to save the inference result. If not provided, the default directory will be the same as the finetuned model checkpoint directory.
+
+> **--plot_confusion True** is a boolean flag to indicate whether to plot the confusion matrix.
+
+
 
 *Jiawen Li, H&G Pathology AI Research Team*
 

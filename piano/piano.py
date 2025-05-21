@@ -14,13 +14,14 @@ import timm
 from timm.data import resolve_data_config
 from timm.data.transforms_factory import create_transform
 
-from transformers import AutoImageProcessor, AutoModel
+import open_clip
+from transformers import AutoImageProcessor, AutoModel, ViTModel
 
 
 
 MODEL_HF_PATHS = {
-    "plip": "vinid/plip",  
     "openai_clip_p16": "openai/clip-vit-base-patch16",  
+    "plip": "vinid/plip",  
     "conch_v1": "hf_hub:MahmoodLab/conch",
     "uni_v1": "hf-hub:MahmoodLab/uni",
     "uni_v2": "hf-hub:MahmoodLab/UNI2-h",
@@ -30,9 +31,52 @@ MODEL_HF_PATHS = {
     "musk": "hf_hub:xiangjx/musk",
     "h_optimus_0": "hf-hub:bioptimus/H-optimus-0",
     "h_optimus_1": "hf-hub:bioptimus/H-optimus-1",
+    "phikon_v1": "owkin/phikon",
     "phikon_v2": "owkin/phikon-v2",
+    "quiltnet_b_32": "hf-hub:wisdomik/QuiltNet-B-32",
+    "quiltnet_b_16": "hf-hub:wisdomik/QuiltNet-B-16",
+    "quiltnet_b_16_pmb": "hf-hub:wisdomik/QuiltNet-B-16-PMB",
     "ctranspath": "YOUR_LOCAL_PATH",
+    "beph": "will update soon"
 }
+
+
+def get_model_output_dim(model_name: str) -> int:
+    """
+    Get the output dimension of a model by its name.
+
+    Args:
+        model_name (str): Name of the model
+
+    Returns:
+        int: Output dimension of the model
+
+    """
+    output_dims = {
+        "openai_clip_p16": 512,
+        "plip": 512,
+        "conch_v1": 512,
+        "uni_v1": 1024,
+        "uni_v2": 1536,
+        "prov_gigapath": 1536,
+        "virchow_v1": 2560,
+        "virchow_v2": 2560,
+        "musk": 2048,
+        "h_optimus_0": 1536,
+        "h_optimus_1": 1536,
+        "phikon_v1": 768,
+        "phikon_v2": 768,
+        "quiltnet_b_32": 512,
+        "quiltnet_b_16": 512,
+        "quiltnet_b_16_pmb": 512,
+        "ctranspath": 768,
+        "beph": 768
+    }
+
+    if model_name not in output_dims:
+        raise ValueError(f"Unknown model name: {model_name}. Available models: {list(output_dims.keys())}")
+    
+    return output_dims[model_name]
 
 
 def get_model_hf_path(model_name):
@@ -507,6 +551,40 @@ class HOptimus1Model(BaseModel):
         return {"patch_tokens": patch_token, "class_token": class_token}
     
 
+@register_model('phikon_v1')
+class PhikonV1Model(BaseModel):
+    def __init__(self, checkpoint_path=None, local_dir=False):
+        super().__init__()
+        if local_dir == True and checkpoint_path is not None:
+            raise NotImplementedError("Local directory not supported for phikon_v1 model")
+        else:
+            checkpoint_path = get_model_hf_path('phikon_v1')
+
+        self.preprocess = AutoImageProcessor.from_pretrained("owkin/phikon")
+        self.backbone = ViTModel.from_pretrained("owkin/phikon", add_pooling_layer=False)
+
+        def phikonprocessor(image):
+            output = self.preprocess(image, return_tensor="pt")
+            return torch.from_numpy(output['pixel_values'][0])
+        
+        self.image_preprocess = phikonprocessor
+        self.output_dim = 768
+
+
+    def forward(self, x):
+        with torch.set_grad_enabled(self.backbone.training):
+            outputs = self.backbone(x)
+            outputs = outputs.last_hidden_state[:, 0, :]
+        return outputs
+
+    def get_img_token(self, x):
+        output = self.backbone(x)
+        patch_token = output.last_hidden_state[:, 1:]
+        class_token = output.last_hidden_state[:, 0]
+        return {"patch_tokens": patch_token, "class_token": class_token}
+    
+
+
 @register_model('phikon_v2')
 class PhikonV2Model(BaseModel):
     def __init__(self, checkpoint_path=None, local_dir=False):
@@ -538,6 +616,193 @@ class PhikonV2Model(BaseModel):
         patch_token = output.last_hidden_state[:, 1:]
         class_token = output.last_hidden_state[:, 0]
         return {"patch_tokens": patch_token, "class_token": class_token}
+    
+
+@register_model('quiltnet_b_32')
+class QuiltNetB32Model(BaseModel):
+    def __init__(self, checkpoint_path=None, local_dir=False):
+        super().__init__()
+        if local_dir == True and checkpoint_path is not None:
+            raise NotImplementedError("Local directory not supported for QuiltNet-B-32 model")
+        else:
+            checkpoint_path = get_model_hf_path('quiltnet_b_32')
+
+        # 加载完整模型和预处理
+        self.model, self.preprocess_train, self.preprocess_val = open_clip.create_model_and_transforms(
+            'hf-hub:wisdomik/QuiltNet-B-32'
+        )
+        self.tokenizer = open_clip.get_tokenizer('hf-hub:wisdomik/QuiltNet-B-32')
+
+        # 设置视觉主干结构
+        self.backbone_visual = self.model.visual       
+        self.backbone = self.backbone_visual           
+        self.model = self.model                        
+
+        self.image_preprocess = self.preprocess_train
+        self.text_preprocess = self._text_preprocess
+        self.output_dim = 512
+
+    def _text_preprocess(self, text):
+        """
+        处理文本为tokenized输入
+        
+        Args:
+            text: 输入文本或文本列表
+            
+        Returns:
+            torch.Tensor: 文本token IDs
+        """
+        if isinstance(text, str):
+            text = [text]
+        tokens = self.tokenizer(text)
+        return tokens
+
+    def forward(self, x):
+        with torch.set_grad_enabled(self.backbone.training):
+            output = self.backbone(x)  # 本质就是 self.backbone_visual(x)
+        return output  # 通常是 class token proj 后的 embedding
+
+    def encode_text(self, text_tokens):
+        """
+        编码文本tokens为文本特征
+        
+        Args:
+            text_tokens: 已tokenized的文本输入
+            
+        Returns:
+            torch.Tensor: 文本特征
+        """
+        with torch.set_grad_enabled(self.model.training):
+            text_features = self.model.encode_text(text_tokens)
+        return text_features
+
+    def get_img_token(self, x):
+        raise NotImplementedError("QuiltNet model does not support image token extraction")
+    
+
+@register_model('quiltnet_b_16')
+class QuiltNetB16Model(BaseModel):
+    def __init__(self, checkpoint_path=None, local_dir=False):
+        super().__init__()
+        if local_dir == True and checkpoint_path is not None:
+            raise NotImplementedError("Local directory not supported for QuiltNet-B-16 model")
+        else:
+            checkpoint_path = get_model_hf_path('quiltnet_b_16')
+
+        # 加载完整模型和预处理
+        self.model, self.preprocess_train, self.preprocess_val = open_clip.create_model_and_transforms(
+            'hf-hub:wisdomik/QuiltNet-B-16'
+        )
+        self.tokenizer = open_clip.get_tokenizer('hf-hub:wisdomik/QuiltNet-B-16')
+
+        # 设置视觉主干结构
+        self.backbone_visual = self.model.visual       
+        self.backbone = self.backbone_visual           
+        self.model = self.model                        
+
+        self.image_preprocess = self.preprocess_train
+        self.text_preprocess = self._text_preprocess
+        self.output_dim = 512
+
+    def _text_preprocess(self, text):
+        """
+        处理文本为tokenized输入
+        
+        Args:
+            text: 输入文本或文本列表
+            
+        Returns:
+            torch.Tensor: 文本token IDs
+        """
+        if isinstance(text, str):
+            text = [text]
+        tokens = self.tokenizer(text)
+        return tokens
+
+    def forward(self, x):
+        with torch.set_grad_enabled(self.backbone.training):
+            output = self.backbone(x)  # 本质就是 self.backbone_visual(x)
+        return output  # 通常是 class token proj 后的 embedding
+
+    def encode_text(self, text_tokens):
+        """
+        编码文本tokens为文本特征
+        
+        Args:
+            text_tokens: 已tokenized的文本输入
+            
+        Returns:
+            torch.Tensor: 文本特征
+        """
+        with torch.set_grad_enabled(self.model.training):
+            text_features = self.model.encode_text(text_tokens)
+        return text_features
+
+    def get_img_token(self, x):
+        raise NotImplementedError("QuiltNet model does not support image token extraction")
+    
+
+@register_model('quiltnet_b_16_pmb')
+class QuiltNetB16_PMB_Model(BaseModel):
+    def __init__(self, checkpoint_path=None, local_dir=False):
+        super().__init__()
+        if local_dir == True and checkpoint_path is not None:
+            raise NotImplementedError("Local directory not supported for QuiltNet-B-16-PMB model")
+        else:
+            checkpoint_path = get_model_hf_path('quiltnet_b_16_pmb')
+
+        # 加载完整模型和预处理
+        self.model, self.preprocess_train, self.preprocess_val = open_clip.create_model_and_transforms(
+            'hf-hub:wisdomik/QuiltNet-B-16-PMB'
+        )
+        self.tokenizer = open_clip.get_tokenizer('hf-hub:wisdomik/QuiltNet-B-16-PMB')
+
+        # 设置视觉主干结构
+        self.backbone_visual = self.model.visual       
+        self.backbone = self.backbone_visual           
+        self.model = self.model                        
+
+        self.image_preprocess = self.preprocess_train
+        self.text_preprocess = self._text_preprocess
+        self.output_dim = 512
+
+    def _text_preprocess(self, text):
+        """
+        处理文本为tokenized输入
+        
+        Args:
+            text: 输入文本或文本列表
+            
+        Returns:
+            torch.Tensor: 文本token IDs
+        """
+        if isinstance(text, str):
+            text = [text]
+        tokens = self.tokenizer(text)
+        return tokens
+
+    def forward(self, x):
+        with torch.set_grad_enabled(self.backbone.training):
+            output = self.backbone(x)  # 本质就是 self.backbone_visual(x)
+        return output  # 通常是 class token proj 后的 embedding
+
+    def encode_text(self, text_tokens):
+        """
+        编码文本tokens为文本特征
+        
+        Args:
+            text_tokens: 已tokenized的文本输入
+            
+        Returns:
+            torch.Tensor: 文本特征
+        """
+        with torch.set_grad_enabled(self.model.training):
+            text_features = self.model.encode_text(text_tokens)
+        return text_features
+
+    def get_img_token(self, x):
+        raise NotImplementedError("QuiltNet model does not support image token extraction")
+
 
 
 

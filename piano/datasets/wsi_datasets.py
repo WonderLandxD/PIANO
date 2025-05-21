@@ -4,50 +4,37 @@ from torch.utils.data import Dataset
 from PIL import Image
 import torchvision.transforms as transforms
 import yaml
-import random
+import os
 
 
 # ############## 
-# Dataset for ROI classification task 
+# Dataset for WSI classification task 
 # ###############
-class ROIDataset(Dataset):
+class WSIDataset(Dataset):
     """
-    Dataset class for ROI classification using JSON file.
+    Dataset class for WSI classification using JSON file.
     The JSON file should contain 'train' and 'valid' splits.
     """
     def __init__(self, 
                  json_path, 
-                 transform=None, 
                  mode='train',
-                 transform_config=None,
-                 few_shot=None):
+                 pfm_name=None,
+                 few_shot=None
+                 ):
         """
-        Initialize ROI dataset
+        Initialize WSI dataset
         
         Args:
             json_path (str): Path to JSON file containing both training and validation data
-            transform (callable, optional): Transform to be applied to images
             mode (str): 'train' or 'valid' to specify which split to use
-            transform_config (str, optional): Path to YAML config file for transforms
+            pfm_name (str): Name of the PFM model
             few_shot (int, optional): Number of samples per class for few-shot learning
         """
         self.json_path = json_path
         print(f"\033[33m Loading Dataset ({mode} split) from {self.json_path} \033[0m")
         self.mode = mode
+        self.pfm_name = pfm_name
         self.few_shot = few_shot
-        
-        # Load transform from config if provided
-        if transform_config:
-            self.transform = self.load_transform_from_config(transform_config)
-        else:
-            # Default transform if none provided
-            self.transform = transforms.Compose([
-                transforms.ToTensor(),
-                transforms.Normalize(
-                    mean=[0.485, 0.456, 0.406],
-                    std=[0.229, 0.224, 0.225]
-                )
-            ]) if transform is None else transform
         
         # Load data from JSON
         self.load_data_from_json()
@@ -64,25 +51,6 @@ class ROIDataset(Dataset):
         
         print(f"Loaded {len(self.data)} samples for {mode} mode")
         print(f"Found {len(self.classes)} classes: {self.classes}")
-    
-    def load_transform_from_config(self, config_path):
-        """Load transform from YAML config file"""
-        with open(config_path, 'r') as f:
-            cfg = yaml.safe_load(f)
-        
-        transform_list = []
-        for transform_cfg in cfg['transforms']:
-            transform_name = transform_cfg['name']
-            transform_params = transform_cfg.get('params', {})
-            
-            if hasattr(transforms, transform_name):
-                transform_cls = getattr(transforms, transform_name)
-                transform = transform_cls(**transform_params)
-                transform_list.append(transform)
-            else:
-                raise ValueError(f"Invalid transform name: {transform_name}")
-        
-        return transforms.Compose(transform_list)
     
     def load_data_from_json(self):
         """Load data from JSON file"""
@@ -106,28 +74,25 @@ class ROIDataset(Dataset):
     def __getitem__(self, idx):
         """Get a sample from the dataset"""
         item = self.data[idx]
-        img_path = item['image_path']
+        feat_path = item['feat_path'].replace("<PFM_NAME>", self.pfm_name)
         label = item['label']
         
         # Load and process image
         try:
-            img = Image.open(img_path).convert('RGB')
+            feat = torch.load(feat_path, map_location='cpu', weights_only=True)
         except Exception as e:
-            print(f"Error loading image {img_path}: {e}")
-            # Return a black image as placeholder
-            img = Image.new('RGB', (224, 224), color=(0, 0, 0))
-        
-        # Apply transforms
-        if self.transform:
-            img = self.transform(img)
+            print(f"Error loading image {feat_path}: {e}")
+            # Return a black feature as placeholder
+            feat = torch.zeros(1, 1024)
         
         # Convert label to index
         label_idx = self.label_map[label]
         
         return {
-            'image': img,
+            'feat': feat['feats'],
+            'coords': feat['coords'],
             'label': torch.tensor(label_idx, dtype=torch.long),
-            'path': img_path
+            'path': feat_path
         }
     
     def get_class_weights(self):
@@ -152,8 +117,45 @@ class ROIDataset(Dataset):
         """Return label mapping"""
         return self.label_map
     
+    def get_name(self, idx):
+        """
+        Extract WSI name from the feature path.
+        
+        Args:
+            idx (int): Index of the sample
+            
+        Returns:
+            str: WSI name extracted from path
+        """
+        if idx >= len(self.data):
+            return f"Unknown_{idx}"
+            
+        item = self.data[idx]
+        feat_path = item['feat_path'].replace("<PFM_NAME>", self.pfm_name)
+        
+        # Extract WSI name from path
+        # Format: .../piano_WSI_NAME_pfm.pth
+        try:
+            # Get the base filename
+            base_name = os.path.basename(feat_path)
+            # Remove the extension
+            base_name = os.path.splitext(base_name)[0]
+            # Extract WSI name - assuming format 'piano_WSINAME_pfmname'
+            if base_name.startswith('piano_'):
+                parts = base_name.split('_')
+                if len(parts) >= 3:
+                    # Join all parts except the first (piano) and the last (pfm name)
+                    wsi_name = '_'.join(parts[1:-1])
+                    return wsi_name
+            
+            # If we couldn't parse it properly, return the full base name
+            return base_name
+        except:
+            return f"WSI_{idx}"
+    
     def sample_few_shot_data(self):
         """Sample few-shot data from the dataset"""
+        import random
         few_shot_data = []
         # Group data by label
         label_data = {}
