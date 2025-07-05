@@ -1,6 +1,7 @@
 """
-Code based on sampler from @mileyan/simple_shot
-Adapted from https://github.com/mbanani/lgssl/blob/df45bae647fc24dce8a6329eb697944053e9a8a0/lgssl/evaluation/fewshot.py.
+Code based on sampler from @mileyan/simple_shot and @mahmoodlab/UNI
+Adapted from https://github.com/mbanani/lgssl/blob/df45bae647fc24dce8a6329eb697944053e9a8a0/lgssl/evaluation/fewshot.py
+and from https://github.com/mahmoodlab/UNI/blob/main/notebooks/crc100k_evaluation.ipynb.
 """
 
 import logging

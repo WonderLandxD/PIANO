@@ -20,7 +20,7 @@
 
 ## 📰 News
 
-**2025-07-05 ( *TODO* ):** Add several MIL, patch and slide FM, modify mil-based fine-tuning (k-fold with train-valid and k-seed with train-valid-test), and update readme file.
+**2025-07-05 ( *TODO* ):** Add several MIL, patch and slide FM, modify mil-based classification fine-tuning (k-fold with train-valid, k-seed with train-valid-test, and few-shot evaluation), mil-based survival (k-fold with train-valid), slide FM evaluation with KNN and ProtoNet, slide FM few-shot evaluation with ProtoNet, and update readme file.
 
 **2025-05-20:** Added fine-tuning codes for slide-level classification tasks. Optimized some codes and README.md. 
 
