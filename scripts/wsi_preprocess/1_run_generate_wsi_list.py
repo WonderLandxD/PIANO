@@ -1,8 +1,18 @@
+# Generate WSI file list to a csv file from a given folder
+
+# Usage:
+# python 1_run_generate_wsi_list.py \
+#     --data_folder /path/to/wsi/folder \
+#     --dataset_name dataset_name \
+#     --save_dir /path/to/save/csv \
+#     --format .svs .sdpc .tiff .tif .ndpi .czi  # (you can specify the file extensions you want to search for)
+
+
+
+
+
 import os
 import csv
-from datetime import date
-
-
 import argparse
 
 def parse():
@@ -10,7 +20,7 @@ def parse():
     parser.add_argument('--data_folder', type=str, required=True, help='Root directory path containing WSI files')
     parser.add_argument('--dataset_name', type=str, required=True, help='Dataset name')
     parser.add_argument('--save_dir', type=str, required=True, help='Directory to save CSV file')
-    parser.add_argument('--additional_file_types', type=str, nargs='+', default=['.svs', '.sdpc', '.tiff', '.tif', '.ndpi'], help='List of WSI file extensions to search for')
+    parser.add_argument('--format', type=str, nargs='+', default=['.svs', '.sdpc', '.tiff', '.tif', '.ndpi', '.czi'], help='List of WSI file extensions to search for')
     return parser.parse_args()
 
 
@@ -34,11 +44,10 @@ def main():
     args = parse()
     
     # Find all WSI files
-    wsi_files = find_wsi_files(args.data_folder, args.file_types)
+    wsi_files = find_wsi_files(args.data_folder, args.format)
     
     # Create save path
-    today = date.today()
-    csv_file_path = os.path.join(args.save_dir, f'{args.dataset_name}_wsi_{today}.csv')
+    csv_file_path = os.path.join(args.save_dir, f'{args.dataset_name}.csv')
     
     # Save to CSV
     save_to_csv(wsi_files, csv_file_path)

@@ -1,0 +1,169 @@
+import torch
+import torch.nn as nn
+import timm
+from transformers import AutoModel
+
+
+class CHIEFModel(nn.Module):
+    def __init__(self, mode):
+        super().__init__()
+        self.mode = mode
+        if self.mode == 'patch':
+
+            from .chief.ctran import ctranspath
+
+            self.patch_model = ctranspath()
+            self.patch_model.head = nn.Identity()  # ctranspath: patch images -> patch features
+            td = torch.load('/mnt/sdb/ljw/piano_weights/CHIEF/CHIEF_CTransPath.pth')
+            self.patch_model.load_state_dict(td['model'], strict=True)
+        elif self.mode == 'slide':
+
+            from .chief.CHIEF import CHIEF
+
+            self.slide_model = CHIEF(size_arg='small', word_embedding_path=r'/mnt/sdb/ljw/piano_weights/CHIEF/Text_emdding.pth', dropout=True, n_classes=2)
+            td = torch.load('/mnt/sdb/ljw/piano_weights/CHIEF/CHIEF_pretraining.pth')
+            self.slide_model.load_state_dict(td, strict=True)
+        else:
+            raise ValueError(f"Invalid mode: {self.mode}")
+    
+    def forward(self, input):
+        if self.mode == 'patch':
+            image_tensor = input
+            output = self.patch_model(image_tensor)
+            return output
+        elif self.mode == 'slide':
+            patch_features = input['feats']
+            anatomical=13
+            result = self.slide_model(patch_features, anatomical)
+            output = result['WSI_feature'] 
+            return output
+        else:
+            raise ValueError(f"Invalid mode: {self.mode}")
+        
+
+class GigaPathModel(nn.Module):
+    def __init__(self, mode):
+        super().__init__()
+        self.mode = mode
+        if self.mode == 'patch':
+            self.patch_model = timm.create_model('hf_hub:prov-gigapath/prov-gigapath', pretrained=True)
+        elif self.mode == 'slide':
+
+            from .gigapath.slide_encoder import create_model
+            
+            self.slide_model = create_model("/mnt/sdb/ljw/piano_weights/GigaPath/slide_encoder.pth", "gigapath_slide_enc12l768d", 1536)
+        else:
+            raise ValueError(f"Invalid mode: {self.mode}")
+    
+    def forward(self, input):
+        if self.mode == 'patch':
+            image_tensor = input['feats']
+            output = self.patch_model(image_tensor)
+            return output
+        elif self.mode == 'slide':
+            patch_features = input['feats']
+            coordinates = input['coords']
+            output = self.slide_model(patch_features, coordinates)[0]
+            return output
+        else:
+            raise ValueError(f"Invalid mode: {self.mode}")
+        
+
+class PRISMModel(nn.Module):
+    def __init__(self, mode):
+        super().__init__()
+        self.mode = mode
+        if self.mode == 'patch':
+
+            import piano
+
+            self.patch_model = piano.create_model('virchow_v1')
+        elif self.mode == 'slide':
+            self.slide_model = AutoModel.from_pretrained('paige-ai/Prism', trust_remote_code=True)
+        else:
+            raise ValueError(f"Invalid mode: {self.mode}")
+    
+    def forward(self, input):
+        if self.mode == 'patch':
+            image_tensor = input['feats']
+            output = self.patch_model.encode_image(image_tensor)
+            return output
+        elif self.mode == 'slide':
+            patch_features = input['feats']
+            result = self.slide_model.slide_representations(patch_features)
+            output = result['image_embedding']
+            return output
+    
+        
+
+class TITANModel(nn.Module):
+    def __init__(self, mode):
+        super().__init__()
+        self.mode = mode
+        if self.mode == 'patch':
+
+            import piano
+
+            self.patch_model = piano.create_model('conch_v1_5')
+        elif self.mode == 'slide':
+            self.slide_model = AutoModel.from_pretrained('MahmoodLab/TITAN', trust_remote_code=True)
+        else:
+            raise ValueError(f"Invalid mode: {self.mode}")
+    
+    def forward(self, input):
+        if self.mode == 'patch':
+            image_tensor = input['feats']
+            output = self.patch_model.encode_image(image_tensor)
+            return output
+        elif self.mode == 'slide':
+            patch_features = input['feats']
+            coordinates = input['coords']
+            patch_size_lv0 = 1024
+            output = self.slide_model.encode_slide_from_patch_features(patch_features, coordinates, patch_size_lv0)
+            return output
+
+
+
+def create_slide_pretrained_model(model_name, mode):
+    if model_name == 'chief':
+        return CHIEFModel(mode)
+    elif model_name == 'gigapath':
+        return GigaPathModel(mode)
+    elif model_name == 'titan':
+        return TITANModel(mode)
+    elif model_name == 'prism':
+        return PRISMModel(mode)
+    else:
+        raise ValueError(f"Invalid model name: {model_name}")
+    
+
+if __name__ == '__main__':
+
+    feat_path = '/mnt/net_sda/ljw_sdb_real/HE-Bench/feats/bcnb/1/prov_gigapath/piano_1_prov_gigapath.pth'
+    features = torch.load(feat_path)['feats'].cuda()
+    coords = torch.load(feat_path)['coords'].cuda()
+    print(features.shape, coords.shape)
+    input = {'feats': features.unsqueeze(0), 'coords': coords.unsqueeze(0)}
+    model = create_slide_pretrained_model('gigapath', mode='slide').cuda()
+    with torch.autocast('cuda', torch.bfloat16), torch.inference_mode():
+        output = model(input)
+        print(output.shape)
+
+    # import h5py
+    # from transformers import AutoModel
+
+    # # load model
+    # titan = AutoModel.from_pretrained('MahmoodLab/TITAN', trust_remote_code=True)
+
+    # # load CONCH v1.5 demo features
+    # h5_path = '/mnt/sdb/ljw/hf_cache/models--MahmoodLab--TITAN/snapshots/b2fb4f475256eb67c6e9ccbf2d6c9c3f25f20791/TCGA_demo_features/TCGA-RM-A68W-01Z-00-DX1.4E62E4F4-415C-46EB-A6C8-45BA14E82708.h5'
+    # with h5py.File(h5_path, 'r') as file:
+    #     features = torch.from_numpy(file['features'][:])  # [1, 1244, 768]
+    #     coords = torch.from_numpy(file['coords'][:])      # [1, 1244, 2]
+    #     print(features.shape, coords.shape)
+    #     patch_size_lv0 = file['coords'].attrs['patch_size_level0']  # . It is 1024 if slide is 40x, or 512 if slide is 20x.
+
+    # # extract slide embedding
+    # with torch.autocast('cuda', torch.float16), torch.inference_mode():
+    #     slide_embedding = titan.encode_slide_from_patch_features(features, coords, patch_size_lv0)  # [1, 768]
+    #     print(slide_embedding.shape)

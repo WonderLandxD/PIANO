@@ -1,6 +1,14 @@
+# Create patch directory list from a given folder
+
+# Usage:
+# python 3_run_create_patchdir_list.py \
+#     --data_folder /path/to/wsi/folder \
+#     --dataset_name dataset_name \
+#     --save_dir /path/to/save/csv
+
+
 import os
 import csv
-from datetime import date
 import argparse
 
 def parse():
@@ -38,8 +46,7 @@ def main():
     patch_dirs = find_thumbnail_dirs(args.data_folder)
     
     # Create save path
-    today = date.today()
-    csv_file_path = os.path.join(args.save_dir, f'{args.dataset_name}_patch_dirs_{today}.csv')
+    csv_file_path = os.path.join(args.save_dir, f'{args.dataset_name}.csv')
     
     # Save to CSV
     save_to_csv(patch_dirs, csv_file_path)

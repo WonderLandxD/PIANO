@@ -1,4 +1,4 @@
-# 🎶 PIANO: Pathology Image ANalysis Orchestrator 
+# 🎶 PIANO (Preview): Pathology Image ANalysis Orchestrator 
 
 **PIANO** is a simple PyTorch library for pathology image analysis. It helps you generate patches from whole-slide images, use pathology foundation models for feature extraction, and more! 🚀
 
@@ -19,6 +19,8 @@
 ---------
 
 ## 📰 News
+
+**2025-07-05 ( *TODO* ):** Add several MIL, patch and slide FM, modify mil-based fine-tuning (k-fold with train-valid and k-seed with train-valid-test), and update readme file.
 
 **2025-05-20:** Added fine-tuning codes for slide-level classification tasks. Optimized some codes and README.md. 
 
@@ -197,11 +199,11 @@ print("Label probs:", probs)
 | `h_optimus_0`            | 1536                 | `hf-hub:bioptimus/H-optimus-0`     | [Hugging Face - bioptimus/H-optimus-0](https://huggingface.co/bioptimus/H-optimus-0) | [H-Optimus-0: An open-source foundation model for histology.](https://github.com/bioptimus/releases/tree/main/models/h-optimus/v0) |
 | `h_optimus_1`            | 1536                 | `hf-hub:bioptimus/H-optimus-1`     | [Hugging Face - bioptimus/H-optimus-1](https://huggingface.co/bioptimus/H-optimus-1) | [H-Optimus-1: The leading foundation model for histology](https://www.bioptimus.com/h-optimus-1#section1) |
 | `phikon_v2`              | 768                  | `owkin/phikon-v2`                  | [Hugging Face - owkin/phikon-v2](https://huggingface.co/owkin/phikon-v2) | [Phikon-v2, a large and public feature extractor for biomarker prediction](https://arxiv.org/abs/2409.09173) |
-| `ctranspath*`            | 768                  | `YOUR_LOCAL_PATH`                  | [Github - Xiyue-Wang/TransPath](https://github.com/Xiyue-Wang/TransPath) | [Transformer-based unsupervised contrastive learning for histopathological image classification](https://www.sciencedirect.com/science/article/abs/pii/S1361841522002043) |
+| `ctranspath`            | 768                  | `JWonderLand/CHIEF_unofficial`                  | [Github - Xiyue-Wang/TransPath](https://github.com/Xiyue-Wang/TransPath) | [Transformer-based unsupervised contrastive learning for histopathological image classification](https://www.sciencedirect.com/science/article/abs/pii/S1361841522002043) |
+| `pathorchestra`         | 1024                 |  `yf-research/PathOrchestra`            | [Hugging Face - yf-research/PathOrchestra](https://huggingface.co/yf-research/PathOrchestra) | [PathOrchestra: A Comprehensive Foundation Model for Computational Pathology with Over 100 Diverse Clinical-Grade Tasks](https://arxiv.org/pdf/2503.24345)
 
-**Note**: `*` means the model is not available on Hugging Face. You need to download the model checkpoint from the official source and load it using the `local_dir` parameter.
 
-*More models will be supported (Updated on 03-18-2025).*
+*More models will be supported (Updated on 2025-07-05).*
 
 ### 🪐 *Generating patches and extracting patch-level features from histopathology WSIs.*
 

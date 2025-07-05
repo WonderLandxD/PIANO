@@ -9,10 +9,10 @@ from torch.utils.data import DataLoader
 from torch.amp import GradScaler
 import torch.optim as optim
 
-from piano import create_model
+from piano.model.patch_encoder import create_patch_encoder
 from piano.datasets.roi_datasets import ROIDataset
-from piano.roi_classification.roi_finetune_tools import ROIClassifier, train_roi, predict_roi, roi_create_ckpt
-from piano.utils.utils import planar_metrics
+from piano.utils.roi_finetune_tools import ROIClassifier, train_roi, predict_roi, roi_create_ckpt
+from piano.utils.evaluation_metrics import planar_metrics
 
 def parse_args():
     parser = argparse.ArgumentParser()
@@ -119,7 +119,7 @@ def main():
     
     # Create model
     print(f"Creating {args.model_name} model...")
-    backbone = create_model(args.model_name, checkpoint_path=args.pretrain_ckpt, local_dir=args.local_dir)
+    backbone = create_patch_encoder(args.model_name, checkpoint_path=args.pretrain_ckpt, local_dir=args.local_dir)
     model = ROIClassifier(backbone, num_classes=len(train_dataset.get_classes()), 
                          training_mode=args.training_mode).to(device)
     

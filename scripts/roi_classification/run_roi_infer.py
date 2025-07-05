@@ -4,10 +4,10 @@ import os
 import pandas as pd
 from torch.utils.data import DataLoader
 
-from piano import create_model
+from piano.model.patch_encoder import create_patch_encoder
 from piano.datasets.roi_datasets import ROIDataset
-from piano.roi_classification.roi_finetune_tools import ROIClassifier, predict_roi, roi_load_ckpt
-from piano.utils.utils import planar_metrics
+from piano.utils.roi_finetune_tools import ROIClassifier, predict_roi, roi_load_ckpt
+from piano.utils.evaluation_metrics import planar_metrics
 
 def parse_args():
     parser = argparse.ArgumentParser()
@@ -38,8 +38,7 @@ def main():
     args = parse_args()
     
     # Set GPU device
-    os.environ["CUDA_VISIBLE_DEVICES"] = str(args.gpu_id)
-    device = torch.device('cuda' if torch.cuda.is_available() and args.gpu_id >= 0 else 'cpu')
+    device = torch.device(f'cuda:{args.gpu_id}' if torch.cuda.is_available() and args.gpu_id >= 0 else 'cpu')
     print(f"Using device: {device}" + (f" (GPU {args.gpu_id})" if torch.cuda.is_available() and args.gpu_id >= 0 else ""))
     
     # Create output directory
@@ -52,7 +51,7 @@ def main():
     
     # Load model
     print(f"Loading {args.model_name} model...")
-    backbone = create_model(args.model_name, checkpoint_path=args.pretrain_ckpt, local_dir=args.local_dir)
+    backbone = create_patch_encoder(args.model_name, checkpoint_path=args.pretrain_ckpt, local_dir=args.local_dir)
     model = ROIClassifier(backbone, num_classes=len(test_dataset.get_classes()), 
                          training_mode=args.training_mode).to(device)
     model, saved_epoch = roi_load_ckpt(args.finetune_ckpt, model)
