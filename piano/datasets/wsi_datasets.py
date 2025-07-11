@@ -89,7 +89,7 @@ class WSIDataset(Dataset):
         label_idx = self.label_map[label]
         
         return {
-            'feat': feat['feats'],
+            'features': feat['feats'],
             'coords': feat['coords'],
             'label': torch.tensor(label_idx, dtype=torch.long),
             'path': feat_path
