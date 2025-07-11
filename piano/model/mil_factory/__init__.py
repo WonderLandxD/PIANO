@@ -81,12 +81,12 @@ MIL_DEFAULT_PARAMS = {
 # Part 4: Model Creation Function
 # ============================================================================
 
-def create_mil_model(model_name, **kwargs):
+def create_mil_model(mil_name, **kwargs):
     """
     Create MIL model
     
     Args:
-        model_name (str): Model name
+        mil_name (str): MIL Model name
         **kwargs: Model parameters that will override default parameters
         
     Returns:
@@ -95,14 +95,14 @@ def create_mil_model(model_name, **kwargs):
     Raises:
         ValueError: If mil_name is not recognized
     """
-    if model_name not in MIL_MODEL_REGISTRY:
+    if mil_name not in MIL_MODEL_REGISTRY:
         available_models = list(MIL_MODEL_REGISTRY.keys())
-        raise ValueError(f"Unknown model: {model_name}. Available models: {available_models}")
+        raise ValueError(f"Unknown model: {mil_name}. Available models: {available_models}")
     
-    model_class = MIL_MODEL_REGISTRY[model_name]
+    model_class = MIL_MODEL_REGISTRY[mil_name]
     
     # Get default parameters for the model
-    if model_name in MIL_DEFAULT_PARAMS:
+    if mil_name in MIL_DEFAULT_PARAMS:
         default_kwargs = MIL_DEFAULT_PARAMS[model_name].copy()
     else:
         # Fallback for any models not in default params
