@@ -103,7 +103,7 @@ def create_mil_model(mil_name, **kwargs):
     
     # Get default parameters for the model
     if mil_name in MIL_DEFAULT_PARAMS:
-        default_kwargs = MIL_DEFAULT_PARAMS[model_name].copy()
+        default_kwargs = MIL_DEFAULT_PARAMS[mil_name].copy()
     else:
         # Fallback for any models not in default params
         default_kwargs = {'dim_in': 1024, 'num_classes': 2, 'survival': False}
