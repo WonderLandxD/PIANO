@@ -56,7 +56,7 @@ def parse_args():
                       help='Metric to use for saving best model')
     parser.add_argument('--save_interval', type=int, default=50,
                       help='Save model checkpoint every N epochs')
-    parser.add_argument('--save_dir', type=str, default='/mnt/sdb/ljw/PIANO-Update/PIANO_THU/RESULTS/slide_classification/mil_train_val_test/',
+    parser.add_argument('--save_dir', type=str, default=None,
                       help='Directory to save intermediate checkpoints')
     
     # GPU related arguments

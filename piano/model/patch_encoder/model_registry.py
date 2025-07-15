@@ -19,7 +19,7 @@ MODEL_HF_PATHS = {
     "ctranspath": "JWonderLand/CHIEF_unofficial",
     "dino_hipt": "JWonderLand/HIPT_unofficial",
     "beph": "JWonderLand/BEPH_unofficial",
-    "pathorchestra": "hf-hub:yf-research/PathOrchestra_V1.0.0.0"
+    "pathorchestra": "hf-hub:AI4Pathology/PathOrchestra"
 }
 
 

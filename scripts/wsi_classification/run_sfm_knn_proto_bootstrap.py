@@ -341,13 +341,13 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='KNN evaluation for slide-level features')
     parser.add_argument('--seed', type=int, default=50, help='Random seed for reproducibility')
     parser.add_argument('--data_json', type=str, 
-                       default="/mnt/sdb/ljw/PIANO-Update/PIANO_THU/WSI_DATA/slide_feature_datasets/clinical_subtyping_gradining/bracs/bracs_3classes.json",
+                       default=None,
                        help='Path to dataset JSON file')
     parser.add_argument('--pfm_name', type=str, default=None, help='PFM model name')
     parser.add_argument('--k', type=int, default=20, help='Number of neighbors for KNN')
     parser.add_argument('--n_bootstrap', type=int, default=1000, help='Number of bootstrap iterations (0 to disable)')
     parser.add_argument('--confidence_level', type=float, default=0.95, help='Confidence level for bootstrap intervals')
-    parser.add_argument('--output_dir', type=str, default='/mnt/sdb/ljw/PIANO-Update/PIANO_THU/RESULTS/slidefeats_knn_classification/', help='Output directory for results')
+    parser.add_argument('--output_dir', type=str, default=None, help='Output directory for results')
     
     args = parser.parse_args()
     dataset_name = args.data_json.split('/')[-1].split('.json')[0]

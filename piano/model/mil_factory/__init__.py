@@ -21,9 +21,7 @@ from .ilramil.ilramil import ILRAMIL
 from .wikg.wikg import WiKG
 from .s4mil.s4mil import S4MIL
 from .amdmil.amdmil import AMD_MIL
-from .rrtmil.rrtmil import RRT_MIL
 from .pooling.mil import MeanPool, MaxPool
-from .retmil.retmil import RetMIL
 from .mamba_2d.mamba_2d import MambaMIL_2D
 from .m4.m4 import M4
 
@@ -44,10 +42,8 @@ MIL_MODEL_REGISTRY = {
     'wikg': WiKG,
     's4mil': S4MIL,
     'amdmil': AMD_MIL,
-    'rrtmil': RRT_MIL,
     'mean_pool': MeanPool,
     'max_pool': MaxPool,
-    'retmil': RetMIL,
     '2dmamba': MambaMIL_2D,
     'm4': M4,
 }
@@ -65,13 +61,11 @@ MIL_DEFAULT_PARAMS = {
     'dsmil': {'dim_in': 1024, 'num_classes': 2, 'nonlinear': True, 'survival': False},
     'dtfdmil': {'dim_in': 1024, 'dim_hidden': 512, 'num_classes': 2, 'num_groups': 4, 'numLayer_Res': 0, 'classifier_dropout': 0.25, 'attCls_dropout': 0.25, 'distill': 'MaxMinS', 'survival': False},
     'ilramil': {'dim_in': 1024, 'dim_hidden': 512, 'num_classes': 2, 'dropout': 0.25, 'num_layers': 2, 'num_heads': 8, 'topk': 2, 'ln': False, 'survival': False},
-    'rrtmil': {'dim_in': 1024, 'dim_hidden': 512, 'num_classes': 2, 'dropout': 0.25, 'survival': False},
     's4mil': {'dim_in': 1024, 'num_classes': 2, 'dropout': 0.25, 'act': 'gelu', 'survival': False},
     'transmil': {'dim_in': 1024, 'dim_hidden': 512, 'num_classes': 2, 'num_layers': 2, 'num_heads': 8, 'dropout': 0.25, 'survival': False},
     'wikg': {'dim_in': 384, 'dim_hidden': None, 'num_classes': 2, 'topk': 6, 'agg_type': 'bi-interaction', 'dropout': 0.3, 'pool': 'attn', 'survival': False},
     'mean_pool': {'dim_in': 1024, 'num_classes': 2, 'survival': False},
     'max_pool': {'dim_in': 1024, 'num_classes': 2, 'survival': False},
-    'retmil': {'dim_in': 1024, 'num_heads': 8, 'window_size': 256, 'stride': 256, 'num_classes': 2, 'survival': False},
     'amdmil': {'dim_in': 1024, 'embed_dim': 512, 'num_classes': 10, 'agent_num': 256, 'survival': False}, 
     '2dmamba': {'dim_in': 1024, 'drop_out': 0.25, 'num_classes': 2, 'survival': False, 'pos_emb_type': None},
     'm4': {'dim_in': 1024, 'experts_out': 512, 'towers_out': 2, 'num_classes': 2, 'towers_hidden': 128, 'tasks': 1, 'num_expert': 4, 'survival': False},

@@ -31,7 +31,7 @@ def parse_args():
     parser = argparse.ArgumentParser(description='Loop to create onestep features of tissue-contained patches at a time')
 
     # input parameters
-    parser.add_argument('--output_dir', type=str, default='/mnt/sdb/ljw/MoPE/histai_patch_features/HISTAI', help='Output directory for features')
+    parser.add_argument('--output_dir', type=str, default=None, help='Output directory for features')
     parser.add_argument('--csv_path', type=str, default=None, help='Path to CSV file containing slide file paths')
 
     # model parameters

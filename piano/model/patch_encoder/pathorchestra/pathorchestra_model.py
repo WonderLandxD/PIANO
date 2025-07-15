@@ -25,7 +25,8 @@ class PathOrchestraModel(BaseModel):
             self.image_preprocess = preprocess
         else:
             from ..model_registry import get_model_hf_path
-            self.backbone = timm.create_model("hf-hub:yf-research/PathOrchestra_V1.0.0.0", pretrained=True, init_values=1e-5, dynamic_img_size=True)
+            checkpoint_path = get_model_hf_path('pathorchestra')
+            self.backbone = timm.create_model(checkpoint_path, pretrained=True, init_values=1e-5, dynamic_img_size=True)
             preprocess = create_transform(**resolve_data_config(self.backbone.pretrained_cfg, model=self.backbone))
             self.image_preprocess = preprocess
         self.output_dim = 1024

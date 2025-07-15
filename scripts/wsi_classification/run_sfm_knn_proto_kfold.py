@@ -404,7 +404,7 @@ if __name__ == "__main__":
     parser.add_argument('--device', type=str, default='auto', 
                        help='Device to use for computation: auto, cuda, cpu, or specific GPU like cuda:0')
     parser.add_argument('--output_dir', type=str, 
-                       default='/mnt/sdb/ljw/PIANO-Update/PIANO_THU/RESULTS/slidefeats_knn_classification/kfold/', 
+                       default=None, 
                        help='Output directory for results')
     
     args = parser.parse_args()
