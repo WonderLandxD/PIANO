@@ -1,7 +1,6 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import sys
 from piano.model.mil_factory.layers.layers import create_mlp
 from piano.model.mil_factory.layers.layers import GlobalAttention, GlobalGatedAttention
 from piano.utils.wsi_finetune_tools import NLLSurvLoss
