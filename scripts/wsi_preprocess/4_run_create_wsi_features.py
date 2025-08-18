@@ -49,7 +49,7 @@ def parse():
 
     parser.add_argument('--amp', type=str, default='bf16', choices=['fp32', 'fp16', 'bf16'], help='Mixed precision mode (fp32, fp16, bf16)')
     parser.add_argument('--image_loader', type=str, default='pil', choices=['pil', 'jpeg4py', 'opencv'], help='Image loading method (pil|jpeg4py|opencv)')
-    parser.add_argument('--image_preprocess', type=str, default=f'{os.path.dirname(os.path.abspath(__file__))}/transform_configs/create_patch_feats_transforms.yaml', help='Path to the YAML file containing image preprocessing configurations')
+    parser.add_argument('--image_preprocess', type=str, default=f'{os.path.dirname(os.path.dirname(os.path.abspath(__file__)))}/transform_configs/create_patch_feats_transforms.yaml', help='Path to the YAML file containing image preprocessing configurations')
 
     return parser.parse_args()
 

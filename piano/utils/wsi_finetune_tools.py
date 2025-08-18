@@ -92,10 +92,13 @@ def train_wsi(model, train_loader, optimizer, scaler, device, epoch, use_amp=Fal
 
         if use_amp:
             scaler.scale(loss).backward()
+            scaler.unscale_(optimizer)
+            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
             scaler.step(optimizer)
             scaler.update()
         else:
             loss.backward()
+            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
             optimizer.step()
 
         total_loss = (total_loss * i + loss.detach().cpu()) / (i + 1)
@@ -182,6 +185,37 @@ def predict_wsi_surv(model, test_loader, device, epoch):
             all_event_times[i] = batch['survival_days'].item()
 
     return all_censorships, all_event_times, all_risk_scores, total_loss.item()
+
+
+class SFMClassifier(nn.Module):
+    def __init__(self, input_dim, num_classes, training_mode='lp'):
+        super().__init__()
+        self.training_mode = training_mode
+        if self.training_mode == 'lp':
+            self.fc = nn.Linear(input_dim, num_classes)
+        elif self.training_mode == 'mlp':
+            self.fc = nn.Sequential(
+                nn.Linear(input_dim, input_dim // 2),
+                nn.GELU(),
+                nn.Linear(input_dim // 2, num_classes)
+            )
+        else:
+            raise ValueError(f"Invalid training mode: {self.training_mode}")
+        
+        self.loss_fn = nn.CrossEntropyLoss()
+    
+    def forward(self, input_dict):
+        x = input_dict['features']
+        logits = self.fc(x.squeeze(1))
+        if 'labels' in input_dict:
+            loss = self.loss_fn(logits, input_dict['labels'])
+        else:
+            loss = None
+        output_dict = {
+            'logits': logits,
+            'loss': loss
+        }
+        return output_dict
 
 
 def wsi_create_ckpt(model, mil_name, epoch):

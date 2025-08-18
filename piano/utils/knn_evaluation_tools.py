@@ -64,8 +64,24 @@ def get_eval_metrics(
         eval_metrics[f"{prefix}report"] = cls_rep
 
     if probs_all is not None:
-        roc_auc = roc_auc_score(targets_all, probs_all, **roc_kwargs)
-        eval_metrics[f"{prefix}auroc"] = roc_auc
+        try:
+            # Check if the number of unique classes in targets matches the probability matrix dimensions
+            unique_classes = len(np.unique(targets_all))
+            if hasattr(probs_all, 'shape') and len(probs_all.shape) > 1:
+                prob_classes = probs_all.shape[1]
+            else:
+                prob_classes = 1  # Binary case with 1D probability array
+            
+            # Only compute AUC if dimensions match or if we can handle the mismatch
+            if unique_classes == prob_classes or prob_classes == 1:
+                roc_auc = roc_auc_score(targets_all, probs_all, **roc_kwargs)
+            else:
+                # Skip AUC calculation when dimensions don't match (common in bootstrap sampling)
+                logging.warning(f"Skipping AUC calculation: {unique_classes} unique classes vs {prob_classes} probability columns")
+                
+        except (ValueError, Exception) as e:
+            # Gracefully handle any AUC calculation errors
+            logging.warning(f"Skipping AUC calculation due to error: {str(e)}")
 
     return eval_metrics
 
@@ -140,26 +156,66 @@ def eval_knn(
     # SimpleShot Eval
     pw_dist = (feats_query[:, None] - feats_proto[None, :]).norm(dim=-1, p=2)
     labels_pred_proto = labels_proto[pw_dist.min(dim=1).indices]
-    proto_metrics = get_eval_metrics(labels_query, labels_pred_proto, prefix="proto_")
+    
+    # Convert distances to probabilities for prototype method
+    # Use negative distances and apply softmax to get probabilities
+    proto_logits = -pw_dist  # Negative distances (closer = higher probability)
+    proto_probs = torch.softmax(proto_logits, dim=1).float().cpu().numpy()  # Convert to float32 before numpy
+    
+    # Determine ROC kwargs and probabilities based on number of classes
+    n_classes = len(np.unique(labels_query))
+    roc_kwargs = {}
+    if n_classes > 2:
+        roc_kwargs = {'average': 'macro', 'multi_class': 'ovr'}
+        proto_probs_for_auc = proto_probs  # Use full probability matrix
+    else:
+        # For binary classification, use only positive class probabilities
+        proto_probs_for_auc = proto_probs[:, 1]  # Assuming positive class is at index 1
+    
+    proto_metrics = get_eval_metrics(
+        labels_query.cpu().numpy(), 
+        labels_pred_proto.cpu().numpy(), 
+        probs_all=proto_probs_for_auc,
+        prefix="proto_", 
+        roc_kwargs=roc_kwargs
+    )
     proto_dump = {
         "preds_all": labels_pred_proto,
         "targets_all": labels_query,
-        "probs_all": None,
+        "probs_all": proto_probs,
         "proto_feats": feats_proto.cpu().numpy(),
         "proto_mean": feats_mean.cpu().numpy(),
     }
 
     # KNN Eval
     knn = sklearn.neighbors.KNeighborsClassifier(n_neighbors=n_neighbors, n_jobs=num_workers)
-    labels_pred_knn = knn.fit(feats_source, labels_source).predict(feats_query)
-    knn_metrics = get_eval_metrics(labels_query, labels_pred_knn, prefix=f"knn{n_neighbors}_")
+    knn.fit(feats_source.float().cpu().numpy(), labels_source.cpu().numpy())  # Ensure float32 compatibility
+    labels_pred_knn = knn.predict(feats_query.float().cpu().numpy())
+    
+    # Get probability predictions for KNN
+    knn_probs = knn.predict_proba(feats_query.float().cpu().numpy())
+    
+    # Handle binary vs multiclass for KNN AUC calculation
+    if n_classes > 2:
+        knn_probs_for_auc = knn_probs  # Use full probability matrix
+    else:
+        # For binary classification, use only positive class probabilities
+        knn_probs_for_auc = knn_probs[:, 1]  # Assuming positive class is at index 1
+    
+    knn_metrics = get_eval_metrics(
+        labels_query.cpu().numpy(), 
+        labels_pred_knn, 
+        probs_all=knn_probs_for_auc,
+        prefix=f"knn{n_neighbors}_",
+        roc_kwargs=roc_kwargs
+    )
     knn_dump = {
         "preds_all": labels_pred_knn,
         "targets_all": labels_query,
-        "probs_all": None,
+        "probs_all": knn_probs,
     }
 
-    return knn_metrics, knn_dump, proto_metrics, proto_dump, 
+    return knn_metrics, knn_dump, proto_metrics, proto_dump
 
 
 def eval_fewshot(

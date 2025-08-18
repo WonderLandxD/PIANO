@@ -9,6 +9,7 @@ from torch.utils.data import DataLoader
 # from uni.downstream.eval_patch_features.fewshot import eval_knn
 from piano.utils.knn_evaluation_tools import eval_knn
 from piano.datasets.oneslide_datasets import OneSlideDatasetKFold
+import pandas as pd
 
 def set_seed(seed=42):
     """Set random seeds for reproducibility"""
@@ -21,48 +22,26 @@ def set_seed(seed=42):
     torch.backends.cudnn.benchmark = False
     print(f"Random seed set to: {seed}")
 
-def get_device(device=None):
-    """Get the appropriate device for computation"""
-    device = torch.device(f"cuda:{device}") if torch.cuda.is_available() else torch.device('cpu')
-
-    print(f"Using device: {device}")
-    
-    if device.type == 'cuda':
-        print(f"CUDA Device: {torch.cuda.get_device_name()}")
-        print(f"Available GPU memory: {torch.cuda.get_device_properties(device).total_memory / 1024**3:.1f} GB")
-    
-    return device
-
-def extract_features_and_labels(dataset, batch_size=32, device='auto'):
-    """Extract features and labels from dataset with GPU support"""
-    device = get_device(device) if isinstance(device, str) else device
-    
-    dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=False, num_workers=1, pin_memory=True if device.type == 'cuda' else False)
+def extract_features_and_labels(dataset, batch_size=32):
+    """Extract features and labels from dataset"""
+    dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=False, num_workers=1)
     
     all_features = []
     all_labels = []
     
-    print(f"Extracting features from {len(dataset)} samples using {device}...")
+    print(f"Extracting features from {len(dataset)} samples...")
     
     with torch.no_grad():  # Disable gradient computation for faster inference
         for batch_idx, batch in enumerate(tqdm(dataloader, desc="Processing batches", total=len(dataloader), ncols=100)):
             features = batch['features']  # [batch_size, 1, feat_dim] or [batch_size, feat_dim]
             labels = batch['labels']      # [batch_size]
             
-            # Move to device for processing
-            features = features.to(device, non_blocking=True)
-            labels = labels.to(device, non_blocking=True)
-            
             # Squeeze the features if it's [batch_size, 1, feat_dim]
             if len(features.shape) == 3 and features.shape[1] == 1:
                 features = features.squeeze(1)  # [batch_size, feat_dim]
             
-            # Move back to CPU for storage
             all_features.append(features.cpu())
             all_labels.append(labels.cpu())
-            
-            # if (batch_idx + 1) % 10 == 0:
-            #     print(f"Processed {(batch_idx + 1) * batch_size} samples")
     
     # Concatenate all features and labels as tensors
     features = torch.cat(all_features, dim=0)
@@ -88,24 +67,61 @@ def get_available_folds(json_path):
         print(f"Error reading JSON file: {e}")
         return []
 
-def run_kfold_evaluation(data_json, pfm_name, k=20, seed=42, device='auto'):
-    """
-    Run k-fold cross validation evaluation
+def save_kfold_raw_values_csv(fold_results, output_file="kfold_raw_results.csv"):
+    """Save raw k-fold values for each fold to CSV file"""
     
-    Args:
-        data_json: path to JSON file with k-fold structure
-        pfm_name: PFM model name
-        k: number of neighbors for KNN
-        seed: random seed
-        device: device to use for computation ('auto', 'cuda', 'cpu', or torch.device)
+    # Create a dictionary to store all raw values
+    raw_data = {}
     
-    Returns:
-        fold_results: results for each fold
-        summary_stats: mean and std across folds
-    """
+    # Get all fold names
+    fold_names = sorted(fold_results.keys())
     
-    # Get device
-    device = get_device(device) if isinstance(device, str) else device
+    # Collect all unique metric keys
+    all_knn_keys = set()
+    all_proto_keys = set()
+    
+    for fold_data in fold_results.values():
+        all_knn_keys.update(fold_data['knn'].keys())
+        all_proto_keys.update(fold_data['proto'].keys())
+    
+    # Add fold number column
+    raw_data['Fold'] = [int(fold_name.split('_')[1]) for fold_name in fold_names]
+    
+    # Add KNN metrics
+    for key in sorted(all_knn_keys):
+        clean_key = key.replace('knn', 'KNN_').replace('_', '_')
+        values = []
+        for fold_name in fold_names:
+            fold_data = fold_results[fold_name]
+            if key in fold_data['knn']:
+                values.append(fold_data['knn'][key])
+            else:
+                values.append(np.nan)
+        raw_data[clean_key] = values
+    
+    # Add Proto metrics  
+    for key in sorted(all_proto_keys):
+        clean_key = key.replace('proto_', 'Proto_')
+        values = []
+        for fold_name in fold_names:
+            fold_data = fold_results[fold_name]
+            if key in fold_data['proto']:
+                values.append(fold_data['proto'][key])
+            else:
+                values.append(np.nan)
+        raw_data[clean_key] = values
+    
+    # Create DataFrame
+    df = pd.DataFrame(raw_data)
+    
+    # Save to CSV
+    df.to_csv(output_file, index=False, float_format='%.6f')
+    
+    print(f"\nK-Fold raw values saved to: {output_file}")
+    print(f"CSV contains {len(df)} folds with {len(df.columns)-1} metrics")
+
+def run_kfold_evaluation(data_json, pfm_name, k=20, seed=42):
+    """Run k-fold cross validation evaluation"""
     
     # Get available folds
     fold_numbers = get_available_folds(data_json)
@@ -117,9 +133,9 @@ def run_kfold_evaluation(data_json, pfm_name, k=20, seed=42, device='auto'):
     # Store results for each fold
     fold_results = {}
     
-    # Define metric keys
-    knn_metric_keys = [f'knn{k}_acc', f'knn{k}_bacc', f'knn{k}_kappa', f'knn{k}_weighted_f1']
-    proto_metric_keys = ['proto_acc', 'proto_bacc', 'proto_kappa', 'proto_weighted_f1']
+    # Define metric keys - 添加AUC指标
+    knn_metric_keys = [f'knn{k}_acc', f'knn{k}_bacc', f'knn{k}_kappa', f'knn{k}_weighted_f1', f'knn{k}_auroc']
+    proto_metric_keys = ['proto_acc', 'proto_bacc', 'proto_kappa', 'proto_weighted_f1', 'proto_auroc']
     all_metric_keys = knn_metric_keys + proto_metric_keys
     
     # Initialize metric storage
@@ -138,9 +154,9 @@ def run_kfold_evaluation(data_json, pfm_name, k=20, seed=42, device='auto'):
         print(f"Fold {fold_num} - Valid samples: {len(valid_dataset)}")
         print(f"Fold {fold_num} - Classes: {train_dataset.get_classes()}")
         
-        # Extract features and labels with GPU support
-        train_feats, train_labels = extract_features_and_labels(train_dataset, device=device, batch_size=1)
-        valid_feats, valid_labels = extract_features_and_labels(valid_dataset, device=device, batch_size=1)
+        # Extract features and labels
+        train_feats, train_labels = extract_features_and_labels(train_dataset, batch_size=1)
+        valid_feats, valid_labels = extract_features_and_labels(valid_dataset, batch_size=1)
         
         # Run evaluation
         print(f"\nRunning KNN evaluation for Fold {fold_num}...")
@@ -169,8 +185,11 @@ def run_kfold_evaluation(data_json, pfm_name, k=20, seed=42, device='auto'):
             if key in proto_metrics:
                 all_metrics[key].append(proto_metrics[key])
         
-        print(f"Fold {fold_num} KNN Results: {knn_metrics}")
-        print(f"Fold {fold_num} Proto Results: {proto_metrics}")
+        # 移除report的打印，只打印数值指标
+        knn_metrics_clean = {k: v for k, v in knn_metrics.items() if 'report' not in k}
+        proto_metrics_clean = {k: v for k, v in proto_metrics.items() if 'report' not in k}
+        print(f"Fold {fold_num} KNN Results: {knn_metrics_clean}")
+        print(f"Fold {fold_num} Proto Results: {proto_metrics_clean}")
     
     # Calculate summary statistics
     summary_stats = calculate_summary_statistics(all_metrics)
@@ -208,12 +227,13 @@ def format_latex_results(mean, std):
 def save_kfold_results_tsv(fold_results, summary_stats, output_file="kfold_results.tsv"):
     """Save k-fold results to TSV file"""
     
-    # Define metric display names
+    # Define metric display names - 与bootstrap文件保持一致
     metric_names = {
         'acc': 'Accuracy',
         'bacc': 'Balanced Accuracy', 
         'kappa': 'Cohen\'s Kappa',
-        'weighted_f1': 'Weighted F1'
+        'weighted_f1': 'Weighted F1',
+        'auroc': 'AUROC'
     }
     
     with open(output_file, 'w', encoding='utf-8') as f:
@@ -272,12 +292,13 @@ def save_kfold_results_tsv(fold_results, summary_stats, output_file="kfold_resul
 def print_and_save_kfold_results(fold_results, summary_stats, output_file="summary_table.txt"):
     """Print formatted k-fold results and save to file"""
     
-    # Define metric display names
+    # Define metric display names - 与bootstrap文件保持一致
     metric_names = {
         'acc': 'Accuracy',
         'bacc': 'Balanced Accuracy', 
         'kappa': 'Cohen\'s Kappa',
-        'weighted_f1': 'Weighted F1'
+        'weighted_f1': 'Weighted F1',
+        'auroc': 'AUROC'
     }
     
     # Prepare output content
@@ -288,14 +309,10 @@ def print_and_save_kfold_results(fold_results, summary_stats, output_file="summa
     content_lines.append(f"Number of Folds: {len(fold_results)}")
     content_lines.append("")
     
-    # Print summary statistics
-    content_lines.append("SUMMARY STATISTICS (Mean ± Std across folds)")
-    content_lines.append("-" * 60)
-    
     for method in ['knn', 'proto']:
         method_name = method.upper()
-        content_lines.append(f"\n{method_name} Results:")
-        content_lines.append("-" * 40)
+        content_lines.append(f"{method_name} Results:")
+        content_lines.append("-" * 50)
         
         for key, stats in summary_stats.items():
             if (method == 'knn' and key.startswith('knn')) or (method == 'proto' and key.startswith('proto')):
@@ -319,28 +336,7 @@ def print_and_save_kfold_results(fold_results, summary_stats, output_file="summa
                 content_lines.append(f"  LaTeX ScriptSize: {latex_formats['scriptsize']}")
                 content_lines.append("")
     
-    # Print individual fold results
-    content_lines.append("\n" + "="*80)
-    content_lines.append("INDIVIDUAL FOLD RESULTS")
-    content_lines.append("="*80)
-    
-    for fold_name in sorted(fold_results.keys()):
-        content_lines.append(f"\n{fold_name.upper()}:")
-        content_lines.append("-" * 30)
-        
-        fold_data = fold_results[fold_name]
-        
-        # KNN results for this fold
-        content_lines.append("KNN:")
-        for key, value in fold_data['knn'].items():
-            if isinstance(value, (int, float)):
-                content_lines.append(f"  {key}: {value:.4f}")
-        
-        # Proto results for this fold
-        content_lines.append("Proto:")
-        for key, value in fold_data['proto'].items():
-            if isinstance(value, (int, float)):
-                content_lines.append(f"  {key}: {value:.4f}")
+        content_lines.append("")
     
     # Print to console
     for line in content_lines:
@@ -353,14 +349,11 @@ def print_and_save_kfold_results(fold_results, summary_stats, output_file="summa
     
     print(f"\nSummary table saved to: {output_file}")
 
-def main(seed=42, k=20, data_json=None, pfm_name=None, output_dir=".", device='auto'):
+def main(seed=42, k=20, data_json=None, pfm_name=None, output_dir="."):
     """Main evaluation function"""
     
     # Set random seed for reproducibility
     set_seed(seed)
-    
-    # Get and print device info
-    device = get_device(device)
     
     # Create output directory if it doesn't exist
     os.makedirs(output_dir, exist_ok=True)
@@ -372,7 +365,6 @@ def main(seed=42, k=20, data_json=None, pfm_name=None, output_dir=".", device='a
     print(f"PFM Name: {pfm_name}")
     print(f"K (neighbors): {k}")
     print(f"Random Seed: {seed}")
-    print(f"Device: {device}")
     print(f"Output Directory: {output_dir}")
     
     # Run k-fold evaluation
@@ -380,16 +372,17 @@ def main(seed=42, k=20, data_json=None, pfm_name=None, output_dir=".", device='a
         data_json=data_json,
         pfm_name=pfm_name,
         k=k,
-        seed=seed,
-        device=device
+        seed=seed
     )
     
     # Save results
     tsv_file = os.path.join(output_dir, "kfold_results.tsv")
     summary_file = os.path.join(output_dir, "summary_table.txt")
+    raw_csv_file = os.path.join(output_dir, "kfold_raw_results.csv")
     
     print_and_save_kfold_results(fold_results, summary_stats, summary_file)
     save_kfold_results_tsv(fold_results, summary_stats, tsv_file)
+    save_kfold_raw_values_csv(fold_results, raw_csv_file)
     
     return fold_results, summary_stats
 
@@ -401,17 +394,14 @@ if __name__ == "__main__":
     parser.add_argument('--data_json', type=str, default=None, help='Path to dataset JSON file with k-fold structure')
     parser.add_argument('--pfm_name', type=str, default=None, help='PFM model name')
     parser.add_argument('--k', type=int, default=20, help='Number of neighbors for KNN')
-    parser.add_argument('--device', type=str, default='auto', 
-                       help='Device to use for computation: auto, cuda, cpu, or specific GPU like cuda:0')
     parser.add_argument('--output_dir', type=str, 
                        default=None, 
                        help='Output directory for results')
+    parser.add_argument('--task_name', type=str, default=None, help='Specify task name')
     
     args = parser.parse_args()
     
-    # Create output directory name based on dataset and PFM
-    dataset_name = args.data_json.split('/')[-1].split('.json')[0]
-    args.output_dir = os.path.join(args.output_dir, f'{dataset_name}_{args.pfm_name}')
+    args.output_dir = os.path.join(args.output_dir, f'{args.task_name}_{args.pfm_name}')
     
     main(seed=args.seed, k=args.k, data_json=args.data_json, pfm_name=args.pfm_name, 
-         output_dir=args.output_dir, device=args.device) 
+         output_dir=args.output_dir)

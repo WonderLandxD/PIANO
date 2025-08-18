@@ -4,6 +4,7 @@ import torch.utils
 from tqdm import tqdm
 from piano.model.slide_encoder import create_slide_encoder
 import time
+os.environ["MAMBA_FORCE_TRITON"] = "0"
 
 # ANSI color codes for progress bar
 GREEN = '\033[92m'
@@ -26,8 +27,8 @@ def load_patch_features(feat_file_path):
     coords = data['coords']   # [N, 2]
     
     return {
-        'feats': features.unsqueeze(0),  # [1, N, C]
-        'coords': coords.unsqueeze(0)   # [1, N, 2]
+        'feats': features.cuda().unsqueeze(0),  # [1, N, C]
+        'coords': coords.cuda().unsqueeze(0)   # [1, N, 2]
     }
 
 def func_onefeat_ext(args, pair_list, gpu_id):

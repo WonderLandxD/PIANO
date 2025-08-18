@@ -8,6 +8,8 @@ from sklearn.utils import resample
 # from uni.downstream.eval_patch_features.fewshot import eval_knn
 from piano.utils.knn_evaluation_tools import eval_knn
 from piano.datasets.oneslide_datasets import OneSlideDataset
+# 在import部分添加pandas
+import pandas as pd
 
 def set_seed(seed=42):
     """Set random seeds for reproducibility"""
@@ -30,8 +32,8 @@ def extract_features_and_labels(dataset, batch_size=32):
     print(f"Extracting features from {len(dataset)} samples...")
     
     for batch_idx, batch in enumerate(dataloader):
-        features = batch['features']  # [batch_size, 1, feat_dim] or [batch_size, feat_dim]
-        labels = batch['labels']      # [batch_size]
+        features = batch['features'].to(torch.float32)  # [batch_size, 1, feat_dim] or [batch_size, feat_dim]
+        labels = batch['labels'].to(torch.float32)      # [batch_size]
         
         # Squeeze the features if it's [batch_size, 1, feat_dim]
         if len(features.shape) == 3 and features.shape[1] == 1:
@@ -52,6 +54,51 @@ def extract_features_and_labels(dataset, batch_size=32):
     
     return features, labels
 
+def save_bootstrap_raw_values_csv(knn_metrics_values, proto_metrics_values, output_file="bootstrap_raw_results.csv"):
+    """Save raw bootstrap values for each iteration to CSV file"""
+    
+    # Create a dictionary to store all raw values
+    raw_data = {}
+    
+    # Add KNN metrics
+    for key, values in knn_metrics_values.items():
+        if values:  # Check if we have values
+            # Clean up column name for better readability
+            clean_key = key.replace('knn', 'KNN_').replace('_', '_')
+            raw_data[clean_key] = values
+    
+    # Add Proto metrics  
+    for key, values in proto_metrics_values.items():
+        if values:  # Check if we have values
+            # Clean up column name for better readability
+            clean_key = key.replace('proto_', 'Proto_')
+            raw_data[clean_key] = values
+    
+    # Only proceed if we have data to save
+    if not raw_data:
+        print("Warning: No bootstrap raw values to save (all metrics were empty)")
+        return
+    
+    # Find the maximum length to ensure all columns have the same length
+    max_length = max(len(values) for values in raw_data.values())
+    
+    # Pad shorter lists with NaN
+    for key in raw_data:
+        if len(raw_data[key]) < max_length:
+            raw_data[key].extend([np.nan] * (max_length - len(raw_data[key])))
+    
+    # Create DataFrame
+    df = pd.DataFrame(raw_data)
+    
+    # Add bootstrap iteration index
+    df.insert(0, 'Bootstrap_Iteration', range(1, len(df) + 1))
+    
+    # Save to CSV
+    df.to_csv(output_file, index=False, float_format='%.6f')
+    
+    print(f"\nBootstrap raw values saved to: {output_file}")
+    print(f"CSV contains {len(df)} bootstrap iterations with {len(df.columns)-1} metrics")
+
 def run_bootstrap_evaluation(train_feats, train_labels, test_feats, test_labels, 
                            k=20, n_bootstrap=1000, confidence_level=0.95, random_state=None):
     """
@@ -69,6 +116,8 @@ def run_bootstrap_evaluation(train_feats, train_labels, test_feats, test_labels,
     
     Returns:
         bootstrap_results: dict containing mean, std, and confidence intervals
+        knn_metrics_values: dict containing raw KNN values for each bootstrap iteration
+        proto_metrics_values: dict containing raw Proto values for each bootstrap iteration
     """
     print(f"\nRunning bootstrap evaluation with {n_bootstrap} iterations using sklearn.utils.resample...")
     
@@ -76,12 +125,12 @@ def run_bootstrap_evaluation(train_feats, train_labels, test_feats, test_labels,
     test_feats_np = test_feats.numpy()
     test_labels_np = test_labels.numpy()
     
-    # Store metrics for KNN
-    knn_metrics_keys = [f'knn{k}_acc', f'knn{k}_bacc', f'knn{k}_kappa', f'knn{k}_weighted_f1']
+    # Store metrics for KNN (including AUC)
+    knn_metrics_keys = [f'knn{k}_acc', f'knn{k}_bacc', f'knn{k}_kappa', f'knn{k}_weighted_f1', f'knn{k}_auroc']
     knn_metrics_values = {key: [] for key in knn_metrics_keys}
     
-    # Store metrics for Proto
-    proto_metrics_keys = ['proto_acc', 'proto_bacc', 'proto_kappa', 'proto_weighted_f1']
+    # Store metrics for Proto (including AUC)
+    proto_metrics_keys = ['proto_acc', 'proto_bacc', 'proto_kappa', 'proto_weighted_f1', 'proto_auroc']
     proto_metrics_values = {key: [] for key in proto_metrics_keys}
     
     for i in range(n_bootstrap):
@@ -111,18 +160,20 @@ def run_bootstrap_evaluation(train_feats, train_labels, test_feats, test_labels,
             n_neighbors=k
         )
         
-        # Store KNN metrics
+        # Store KNN metrics (only if they exist)
         for key in knn_metrics_keys:
             if key in knn_metrics:
                 knn_metrics_values[key].append(knn_metrics[key])
         
-        # Store Proto metrics
+        # Store Proto metrics (only if they exist)
         for key in proto_metrics_keys:
             if key in proto_metrics:
                 proto_metrics_values[key].append(proto_metrics[key])
     
     # Calculate statistics using numpy
     def compute_stats(values):
+        if not values:  # Handle empty lists
+            return None
         values_array = np.array(values)
         alpha = 1 - confidence_level
         lower_percentile = (alpha / 2) * 100
@@ -140,17 +191,30 @@ def run_bootstrap_evaluation(train_feats, train_labels, test_feats, test_labels,
         'proto': {}
     }
     
-    # Compute statistics for KNN metrics
+    # Compute statistics for KNN metrics (only for metrics with sufficient data)
     for key in knn_metrics_keys:
-        if knn_metrics_values[key]:  # Check if we have values
+        if knn_metrics_values[key] and len(knn_metrics_values[key]) > n_bootstrap * 0.5:  # Only include if >50% success rate
             bootstrap_results['knn'][key] = compute_stats(knn_metrics_values[key])
+        elif key.endswith('_auroc'):
+            print(f"Warning: {key} only computed for {len(knn_metrics_values[key])}/{n_bootstrap} bootstrap samples, excluding from results")
     
-    # Compute statistics for Proto metrics
+    # Compute statistics for Proto metrics (only for metrics with sufficient data)
     for key in proto_metrics_keys:
-        if proto_metrics_values[key]:  # Check if we have values
+        if proto_metrics_values[key] and len(proto_metrics_values[key]) > n_bootstrap * 0.5:  # Only include if >50% success rate
             bootstrap_results['proto'][key] = compute_stats(proto_metrics_values[key])
+        elif key.endswith('_auroc'):
+            print(f"Warning: {key} only computed for {len(proto_metrics_values[key])}/{n_bootstrap} bootstrap samples, excluding from results")
     
-    return bootstrap_results
+    # Clean up empty auroc entries from values dictionaries if they don't have enough data
+    for key in list(knn_metrics_values.keys()):
+        if key.endswith('_auroc') and len(knn_metrics_values[key]) <= n_bootstrap * 0.5:
+            del knn_metrics_values[key]
+    
+    for key in list(proto_metrics_values.keys()):
+        if key.endswith('_auroc') and len(proto_metrics_values[key]) <= n_bootstrap * 0.5:
+            del proto_metrics_values[key]
+    
+    return bootstrap_results, knn_metrics_values, proto_metrics_values
 
 def format_latex_results(mean, std):
     """Format results in three different LaTeX styles"""
@@ -173,7 +237,8 @@ def save_bootstrap_results_tsv(bootstrap_results, standard_knn, standard_proto,
         'acc': 'Accuracy',
         'bacc': 'Balanced Accuracy', 
         'kappa': 'Cohen\'s Kappa',
-        'weighted_f1': 'Weighted F1'
+        'weighted_f1': 'Weighted F1',
+        'auroc': 'AUROC'
     }
     
     with open(output_file, 'w', encoding='utf-8') as f:
@@ -183,6 +248,9 @@ def save_bootstrap_results_tsv(bootstrap_results, standard_knn, standard_proto,
         
         # Write KNN results
         for key, stats in bootstrap_results['knn'].items():
+            if stats is None:  # Skip metrics that couldn't be computed
+                continue
+                
             metric = key.split('_', 1)[1] if '_' in key else key
             display_name = metric_names.get(metric, metric.replace('_', ' ').title())
             
@@ -201,6 +269,9 @@ def save_bootstrap_results_tsv(bootstrap_results, standard_knn, standard_proto,
         
         # Write Proto results
         for key, stats in bootstrap_results['proto'].items():
+            if stats is None:  # Skip metrics that couldn't be computed
+                continue
+                
             metric = key.replace('proto_', '')
             display_name = metric_names.get(metric, metric.replace('_', ' ').title())
             
@@ -228,7 +299,8 @@ def print_and_save_bootstrap_results(results, confidence_level=0.95,
         'acc': 'Accuracy',
         'bacc': 'Balanced Accuracy', 
         'kappa': 'Cohen\'s Kappa',
-        'weighted_f1': 'Weighted F1'
+        'weighted_f1': 'Weighted F1',
+        'auroc': 'AUROC'
     }
     
     # Prepare output content
@@ -245,6 +317,9 @@ def print_and_save_bootstrap_results(results, confidence_level=0.95,
         content_lines.append("-" * 50)
         
         for key, stats in results[method].items():
+            if stats is None:  # Skip metrics that couldn't be computed
+                continue
+                
             # Extract metric name from key
             if method == 'knn':
                 metric = key.split('_', 1)[1] if '_' in key else key
@@ -318,7 +393,7 @@ def main(seed=42, k=20, data_json=None, pfm_name=None, n_bootstrap=1000,
     
     # Run bootstrap evaluation if requested
     if n_bootstrap > 0:
-        bootstrap_results = run_bootstrap_evaluation(
+        bootstrap_results, knn_raw_values, proto_raw_values = run_bootstrap_evaluation(
             train_feats, train_labels, test_feats, test_labels,
             k=k, n_bootstrap=n_bootstrap, confidence_level=confidence_level,
             random_state=seed
@@ -327,10 +402,12 @@ def main(seed=42, k=20, data_json=None, pfm_name=None, n_bootstrap=1000,
         # Print and save results
         tsv_file = os.path.join(output_dir, "bootstrap_results.tsv")
         summary_file = os.path.join(output_dir, "summary_table.txt")
+        raw_csv_file = os.path.join(output_dir, "bootstrap_raw_results.csv")
         
         print_and_save_bootstrap_results(bootstrap_results, confidence_level, summary_file)
         save_bootstrap_results_tsv(bootstrap_results, knn_eval_metrics, proto_eval_metrics, tsv_file)
-        
+        save_bootstrap_raw_values_csv(knn_raw_values, proto_raw_values, raw_csv_file)
+                
         return knn_eval_metrics, proto_eval_metrics, bootstrap_results
     
     return knn_eval_metrics, proto_eval_metrics
@@ -339,19 +416,19 @@ if __name__ == "__main__":
     import argparse
     
     parser = argparse.ArgumentParser(description='KNN evaluation for slide-level features')
-    parser.add_argument('--seed', type=int, default=50, help='Random seed for reproducibility')
+    parser.add_argument('--seed', type=int, default=2077, help='Random seed for reproducibility')
     parser.add_argument('--data_json', type=str, 
                        default=None,
                        help='Path to dataset JSON file')
-    parser.add_argument('--pfm_name', type=str, default=None, help='PFM model name')
+    parser.add_argument('--pfm_name', type=str, default=None, help='PFM (slide-level) name')
     parser.add_argument('--k', type=int, default=20, help='Number of neighbors for KNN')
     parser.add_argument('--n_bootstrap', type=int, default=1000, help='Number of bootstrap iterations (0 to disable)')
     parser.add_argument('--confidence_level', type=float, default=0.95, help='Confidence level for bootstrap intervals')
     parser.add_argument('--output_dir', type=str, default=None, help='Output directory for results')
+    parser.add_argument('--task_name', type=str, default=None, help='Specify task name')
     
     args = parser.parse_args()
-    dataset_name = args.data_json.split('/')[-1].split('.json')[0]
-    args.output_dir = os.path.join(args.output_dir, f'{dataset_name}_{args.pfm_name}')
+    args.output_dir = os.path.join(args.output_dir, f'{args.task_name}_{args.pfm_name}')
     main(seed=args.seed, k=args.k, data_json=args.data_json, pfm_name=args.pfm_name,
          n_bootstrap=args.n_bootstrap, confidence_level=args.confidence_level, output_dir=args.output_dir)
 

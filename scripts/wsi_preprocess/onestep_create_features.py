@@ -35,7 +35,7 @@ def parse_args():
     parser.add_argument('--csv_path', type=str, default=None, help='Path to CSV file containing slide file paths')
 
     # model parameters
-    parser.add_argument('--model_name', type=str, default='uni_v1', choices=['uni_v1', 'conch_v1', 'conch_v1_5', 'uni_v2', 'prov_gigapath', 'virchow_v1', 'virchow_v2'], help='Model name')
+    parser.add_argument('--model_name', type=str, default='uni_v1', help='Model name')
     parser.add_argument('--gpu_id', type=int, default=0, help='GPU ID')
     parser.add_argument('--batch_size', type=int, default=64, help='Batch size')
     parser.add_argument('--patch_size', type=int, default=256, help='Patch size')
@@ -118,19 +118,26 @@ if __name__ == '__main__':
         print(f"Progress: {i+1}/{len(slide_list)}, slide: {slide_path}")
         print('-'*100)
         time_start = time.time()
-        extract_wsi_features(
-            slide_path=slide_path, 
-            feat_path=output_path, 
-            model=model, 
-            device=device, 
-            batch_size=args.batch_size, 
-            patch_size=args.patch_size, 
-            overlap=args.overlap, 
-            wsi_level=args.wsi_level, 
-            blank_TH=args.blank_TH, 
-            kernel_size=args.kernel_size, 
-            save_patches=args.save_patches, 
-            patch_save_dir=args.patch_save_dir)
+        try:
+            extract_wsi_features(
+                slide_path=slide_path, 
+                feat_path=output_path, 
+                model=model, 
+                device=device, 
+                batch_size=args.batch_size, 
+                patch_size=args.patch_size, 
+                overlap=args.overlap, 
+                wsi_level=args.wsi_level, 
+                blank_TH=args.blank_TH, 
+                kernel_size=args.kernel_size, 
+                save_patches=args.save_patches, 
+                patch_save_dir=args.patch_save_dir)
+        except Exception as e:
+            print(f"Error: {e}")
+            print(f"Slide {slide_path} failed, time: {time.time() - time_start:.2f}s")
+            print('-'*100)
+            print('\n\n\n')
+            continue
         print(f"Slide {slide_path} completed, time: {time.time() - time_start:.2f}s")
         print('-'*100)
         print('\n\n\n')

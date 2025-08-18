@@ -8,6 +8,7 @@ os.environ['OPENCV_IO_MAX_IMAGE_PIXELS'] = str(pow(2,40))  # Very large limit fo
 
 try:
     import opensdpc
+    import openslide
 except:
     import openslide
     OPENSDPC_AVAILABLE = False
@@ -404,7 +405,11 @@ def process_opensdpc_wsi(slide_path, save_path, args, patch_progress):
     try:
         slide = opensdpc.OpenSdpc(slide_path)
     except:
-        slide = openslide.OpenSlide(slide_path)
+        try:
+            slide = openslide.OpenSlide(slide_path)
+        except:
+            print(f"Error opening WSI: {slide_path}")
+            
     
     # Use the last level as thumbnail (safer than thumb_n offset)
     thumbnail_level = slide.level_count - 1
@@ -474,36 +479,39 @@ def func_patching(args, pair_list, thread_id):
         save_path = pair_path[1]
         os.makedirs(save_path, exist_ok=True)
 
-        # Check file format first
-        if is_jpg_format(slide_path):   # JPG 
-            # Process JPG format WSI (always use PIL-based processing for JPG)
-            # Set initial progress bar with placeholder value since we'll update it after coordinate generation
-            patch_progress = tqdm(total=1000, 
-                                desc=f'THREAD {thread_id} Slide {item+1}/{total_slides} (JPG)', 
+        try:
+            # Check file format first
+            if is_jpg_format(slide_path):   # JPG 
+                # Process JPG format WSI (always use PIL-based processing for JPG)
+                # Set initial progress bar with placeholder value since we'll update it after coordinate generation
+                patch_progress = tqdm(total=1000, 
+                                    desc=f'THREAD {thread_id} Slide {item+1}/{total_slides} (JPG)', 
+                                    position=thread_id, 
+                                    ncols=90,  
+                                    leave=False)
+                
+                process_jpg_wsi(slide_path, save_path, args, patch_progress)
+                patch_progress.close()
+                
+            elif hasattr(args, 'backend') and args.backend == 'pyvips':  # PYVIPS
+                # Process WSI format using pyvips
+                patch_progress = tqdm(total=1000, 
+                                    desc=f'THREAD {thread_id} Slide {item+1}/{total_slides} (PYVIPS)', 
+                                    position=thread_id, 
+                                    ncols=90,  
+                                    leave=False)
+                
+                process_pyvips_wsi(slide_path, save_path, args, patch_progress)
+                patch_progress.close()
+                
+            else:  # OPENSDPC & OPENSLIDE
+                patch_progress = tqdm(total=1000, 
+                                desc=f'THREAD {thread_id} Slide {item+1}/{total_slides} (OPENSDPC)', 
                                 position=thread_id, 
                                 ncols=90,  
                                 leave=False)
-            
-            process_jpg_wsi(slide_path, save_path, args, patch_progress)
-            patch_progress.close()
-            
-        elif hasattr(args, 'backend') and args.backend == 'pyvips':  # PYVIPS
-            # Process WSI format using pyvips
-            patch_progress = tqdm(total=1000, 
-                                desc=f'THREAD {thread_id} Slide {item+1}/{total_slides} (PYVIPS)', 
-                                position=thread_id, 
-                                ncols=90,  
-                                leave=False)
-            
-            process_pyvips_wsi(slide_path, save_path, args, patch_progress)
-            patch_progress.close()
-            
-        else:  # OPENSDPC & OPENSLIDE
-            patch_progress = tqdm(total=1000, 
-                            desc=f'THREAD {thread_id} Slide {item+1}/{total_slides} (OPENSDPC)', 
-                            position=thread_id, 
-                            ncols=90,  
-                            leave=False)
-            process_opensdpc_wsi(slide_path, save_path, args, patch_progress)
-            patch_progress.close()
+                process_opensdpc_wsi(slide_path, save_path, args, patch_progress)
+                patch_progress.close()
+        except:
+            continue
 

@@ -177,6 +177,7 @@ def extract_wsi_features(slide_path, feat_path, model, device, batch_size=64,
             pass
     
     if slide is None and OPENSLIDE_AVAILABLE:
+        print(f"\033[92m[OpenSlide] Opening slide: {slide_path}\033[0m")  # Print slide_path in green
         slide = openslide.OpenSlide(slide_path)
     
     if slide is None:

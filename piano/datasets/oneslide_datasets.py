@@ -83,7 +83,7 @@ class OneSlideDataset(Dataset):
         label_idx = self.label_map[label]
         
         return {
-            'features': feat['slide_feats'],
+            'features': feat['slide_feats'].to(torch.float32),
             'slide_id': feat['slide_id'],
             'labels': torch.tensor(label_idx, dtype=torch.long),
             'path': feat_path
@@ -446,7 +446,7 @@ class OneSlideDatasetKFold(Dataset):
         label_idx = self.label_map[label]
         
         return {
-            'features': feat['slide_feats'],
+            'features': feat['slide_feats'].to(torch.float32),
             'slide_id': feat['slide_id'],
             'labels': torch.tensor(label_idx, dtype=torch.long),
             'path': feat_path
