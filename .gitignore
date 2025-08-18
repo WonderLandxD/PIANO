@@ -49,3 +49,5 @@ demo_roi_classification/
 convert_csv_to_json.py
 
 FINE_TUNE_DATA/
+
+datasets/
