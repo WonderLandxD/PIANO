@@ -12,7 +12,20 @@ import torch.nn as nn
 import warnings
 
 warnings.simplefilter(action="ignore", category=FutureWarning)
-from mamba_ssm import Mamba2
+
+try:
+    from mamba_ssm import Mamba2
+    _MAMBA_AVAILABLE = True
+except ImportError:
+    _MAMBA_AVAILABLE = False
+    
+    # Create a placeholder class to prevent immediate import errors
+    class Mamba2:
+        def __init__(self, *args, **kwargs):
+            raise ImportError(
+                "mamba_ssm is not installed. Please install it using: "
+                "pip install mamba-ssm"
+            )
 
 
 def initialize_weights(module):
@@ -39,6 +52,12 @@ class Mamba2Enc(nn.Module):
         d_state=64,
     ):
         super(Mamba2Enc, self).__init__()
+        
+        if not _MAMBA_AVAILABLE:
+            raise ImportError(
+                "COBRA model requires 'mamba_ssm' library which is not installed. "
+                "Please install it using: pip install mamba-ssm"
+            )
         self._fc1 = [nn.Linear(in_dim, dim)]
         if act.lower() == "relu":
             self._fc1 += [nn.ReLU()]
