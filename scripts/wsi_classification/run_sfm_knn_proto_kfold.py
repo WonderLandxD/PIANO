@@ -397,14 +397,14 @@ if __name__ == "__main__":
     parser.add_argument('--output_dir', type=str, 
                        default=None, 
                        help='Output directory for results')
-    parser.add_argument('--task_name', type=str, default=None, help='Specify task name')
+    parser.add_argument('--task_name', type=str, help='Specify task name')
     
     args = parser.parse_args()
-    if args.task_name is None:
-        task_name = args.data_json.split('/')[-1].split('.')[0]
-    else:
+    if args.task_name:
         task_name = args.task_name
-    args.output_dir = os.path.join(args.output_dir, f'{args.task_name}_{args.pfm_name}')
+    else:
+        task_name = args.data_json.split('/')[-1].split('.')[0]
+    args.output_dir = os.path.join(args.output_dir, f'{task_name}_{args.pfm_name}')
     
     main(seed=args.seed, k=args.k, data_json=args.data_json, pfm_name=args.pfm_name, 
          output_dir=args.output_dir)
