@@ -26,7 +26,7 @@ def parse_args():
                        help='Run evaluation on all folds and compute summary statistics')
     
     # Feature related arguments
-    parser.add_argument('--pfm_name', type=str, default='chief', 
+    parser.add_argument('--pfm_name', type=str, default=None, 
                        help='Name of the pre-computed slide-level features to use from dataset')
     
     # Retrieval related arguments
@@ -44,7 +44,7 @@ def parse_args():
     parser.add_argument('--seed', type=int, default=42, help='Random seed')
     
     # Output related arguments
-    parser.add_argument('--output_dir', type=str, default='/mnt/sdb/ljw/PIANO-Update/PIANO_Preview/results/retrieval_results',
+    parser.add_argument('--output_dir', type=str, default=None,
                        help='Directory to save retrieval results')
     
     

@@ -428,6 +428,10 @@ if __name__ == "__main__":
     parser.add_argument('--task_name', type=str, default=None, help='Specify task name')
     
     args = parser.parse_args()
+    if args.task_name is None:
+        task_name = args.data_json.split('/')[-1].split('.')[0]
+    else:
+        task_name = args.task_name
     args.output_dir = os.path.join(args.output_dir, f'{args.task_name}_{args.pfm_name}')
     main(seed=args.seed, k=args.k, data_json=args.data_json, pfm_name=args.pfm_name,
          n_bootstrap=args.n_bootstrap, confidence_level=args.confidence_level, output_dir=args.output_dir)
