@@ -41,8 +41,8 @@ def parse_args():
     parser.add_argument('--early_stopping', type=int, default=5, help='Number of epochs with no improvement to wait before early stopping')
     
     # Seed related arguments
-    parser.add_argument('--start_seed', type=int, default=30, help='Starting seed')
-    parser.add_argument('--end_seed', type=int, default=35, help='Ending seed (exclusive)')
+    parser.add_argument('--start_seed', type=int, default=2077, help='Starting seed')
+    parser.add_argument('--end_seed', type=int, default=2082, help='Ending seed (exclusive)')
     parser.add_argument('--seeds', type=int, nargs='+', default=None, help='Specific seeds to run (if provided, overrides start_seed and end_seed)')
     
     # Mixed precision training arguments
