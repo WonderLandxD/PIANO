@@ -58,4 +58,4 @@ RESULTS/
 experiments/
 
 # Exclude ProTEA
-model/slide_encoder/protea/
+piano/model/slide_encoder/protea/
