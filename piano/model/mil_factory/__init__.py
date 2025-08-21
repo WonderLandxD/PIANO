@@ -2,51 +2,109 @@
 MIL Factory - Multiple Instance Learning Models Factory
 
 This module provides a unified interface for creating MIL baseline models.
+Uses lazy loading to avoid import failures affecting other models.
 """
 
 import torch
 import torch.nn as nn
 
 # ============================================================================
-# Part 1: Import all MIL models
+# Part 1: Available Models Registry (Lazy Loading)
 # ============================================================================
 
-from .abmil.abmil import ABMIL, GatedABMIL
-from .clam.clam import CLAM_SB, CLAM_MB
-from .transmil.transmil import TransMIL
-from .dgrmil.dgrmil import DGRMIL
-from .dtfdmil.dtfdmil import DTFDMIL
-from .dsmil.dsmil import DSMIL
-from .ilramil.ilramil import ILRAMIL
-from .wikg.wikg import WiKG
-from .s4mil.s4mil import S4MIL
-from .amdmil.amdmil import AMD_MIL
-from .pooling.mil import MeanPool, MaxPool
-from .mamba_2d.mamba_2d import MambaMIL_2D
-from .m4.m4 import M4
+# Available model names for lazy loading
+AVAILABLE_MODELS = [
+    'abmil', 'gated_abmil', 'clam_sb', 'clam_mb', 'transmil', 'dgrmil',
+    'dtfdmil', 'dsmil', 'ilramil', 'wikg', 's4mil', 'amdmil', 
+    'mean_pool', 'max_pool', '2dmamba', 'mambamil', 'm4'
+]
+
+def _lazy_load_model(model_name):
+    """
+    Lazy load model class based on model name
+    
+    Args:
+        model_name (str): Name of the model to load
+        
+    Returns:
+        class: Model class
+        
+    Raises:
+        ImportError: If model cannot be imported
+        ValueError: If model name is not recognized
+    """
+    if model_name == 'abmil':
+        from .abmil.abmil import ABMIL
+        return ABMIL
+    elif model_name == 'gated_abmil':
+        from .abmil.abmil import GatedABMIL
+        return GatedABMIL
+    elif model_name == 'clam_sb':
+        from .clam.clam import CLAM_SB
+        return CLAM_SB
+    elif model_name == 'clam_mb':
+        from .clam.clam import CLAM_MB
+        return CLAM_MB
+    elif model_name == 'transmil':
+        from .transmil.transmil import TransMIL
+        return TransMIL
+    elif model_name == 'dgrmil':
+        from .dgrmil.dgrmil import DGRMIL
+        return DGRMIL
+    elif model_name == 'dtfdmil':
+        from .dtfdmil.dtfdmil import DTFDMIL
+        return DTFDMIL
+    elif model_name == 'dsmil':
+        from .dsmil.dsmil import DSMIL
+        return DSMIL
+    elif model_name == 'ilramil':
+        from .ilramil.ilramil import ILRAMIL
+        return ILRAMIL
+    elif model_name == 'wikg':
+        from .wikg.wikg import WiKG
+        return WiKG
+    elif model_name == 's4mil':
+        from .s4mil.s4mil import S4MIL
+        return S4MIL
+    elif model_name == 'amdmil':
+        from .amdmil.amdmil import AMD_MIL
+        return AMD_MIL
+    elif model_name == 'mean_pool':
+        from .pooling.mil import MeanPool
+        return MeanPool
+    elif model_name == 'max_pool':
+        from .pooling.mil import MaxPool
+        return MaxPool
+    elif model_name == '2dmamba':
+        from .mamba_2d.mamba_2d import MambaMIL_2D
+        return MambaMIL_2D
+    elif model_name == 'mambamil':
+        from .mambamil.mambamil import MambaMIL
+        return MambaMIL
+    elif model_name == 'm4':
+        from .m4.m4 import M4
+        return M4
+    else:
+        raise ValueError(f"Unknown model: {model_name}. Available models: {AVAILABLE_MODELS}")
 
 # ============================================================================
-# Part 2: Model Registry
+# Part 2: Model Registry (For compatibility)
 # ============================================================================
 
-MIL_MODEL_REGISTRY = {
-    'abmil': ABMIL,
-    'gated_abmil': GatedABMIL,
-    'clam_sb': CLAM_SB,
-    'clam_mb': CLAM_MB,
-    'transmil': TransMIL,
-    'dgrmil': DGRMIL,
-    'dtfdmil': DTFDMIL,
-    'dsmil': DSMIL,
-    'ilramil': ILRAMIL,
-    'wikg': WiKG,
-    's4mil': S4MIL,
-    'amdmil': AMD_MIL,
-    'mean_pool': MeanPool,
-    'max_pool': MaxPool,
-    '2dmamba': MambaMIL_2D,
-    'm4': M4,
-}
+class LazyModelRegistry:
+    """Lazy model registry that loads models on demand"""
+    
+    def __contains__(self, key):
+        return key in AVAILABLE_MODELS
+    
+    def __getitem__(self, key):
+        return _lazy_load_model(key)
+    
+    def keys(self):
+        return AVAILABLE_MODELS
+
+# Create registry instance
+MIL_MODEL_REGISTRY = LazyModelRegistry()
 
 # ============================================================================
 # Part 3: Default Parameters for each model
@@ -68,6 +126,7 @@ MIL_DEFAULT_PARAMS = {
     'max_pool': {'dim_in': 1024, 'num_classes': 2, 'survival': False},
     'amdmil': {'dim_in': 1024, 'embed_dim': 512, 'num_classes': 10, 'agent_num': 256, 'survival': False}, 
     '2dmamba': {'dim_in': 1024, 'drop_out': 0.25, 'num_classes': 2, 'survival': False, 'pos_emb_type': None},
+    'mambamil': {'dim_in': 1024, 'num_classes': 2, 'dropout': 0.25, 'act': 'gelu', 'survival': False, 'layer': 2, 'rate': 10, 'type': 'SRMamba'},
     'm4': {'dim_in': 1024, 'experts_out': 512, 'towers_out': 2, 'num_classes': 2, 'towers_hidden': 128, 'tasks': 1, 'num_expert': 4, 'survival': False},
 }
 
@@ -77,7 +136,7 @@ MIL_DEFAULT_PARAMS = {
 
 def create_mil_model(model_name, **kwargs):
     """
-    Create MIL model
+    Create MIL model using lazy loading
     
     Args:
         model_name (str): Model name
@@ -87,13 +146,17 @@ def create_mil_model(model_name, **kwargs):
         torch.nn.Module: Created model instance
         
     Raises:
-        ValueError: If mil_name is not recognized
+        ValueError: If model_name is not recognized
+        ImportError: If model cannot be imported
     """
-    if model_name not in MIL_MODEL_REGISTRY:
-        available_models = list(MIL_MODEL_REGISTRY.keys())
-        raise ValueError(f"Unknown model: {model_name}. Available models: {available_models}")
+    if model_name not in AVAILABLE_MODELS:
+        raise ValueError(f"Unknown model: {model_name}. Available models: {AVAILABLE_MODELS}")
     
-    model_class = MIL_MODEL_REGISTRY[model_name]
+    try:
+        # Lazy load the model class
+        model_class = _lazy_load_model(model_name)
+    except ImportError as e:
+        raise ImportError(f"Failed to import model '{model_name}': {e}")
     
     # Get default parameters for the model
     if model_name in MIL_DEFAULT_PARAMS:
@@ -115,7 +178,7 @@ def get_mil_model_names():
     Returns:
         list: List of available model names
     """
-    return list(MIL_MODEL_REGISTRY.keys())
+    return AVAILABLE_MODELS.copy()
 
 
 def get_mil_default_params(mil_name):
@@ -131,9 +194,8 @@ def get_mil_default_params(mil_name):
     Raises:
         ValueError: If mil_name is not recognized
     """
-    if mil_name not in MIL_MODEL_REGISTRY:
-        available_models = list(MIL_MODEL_REGISTRY.keys())
-        raise ValueError(f"Unknown model: {mil_name}. Available models: {available_models}")
+    if mil_name not in AVAILABLE_MODELS:
+        raise ValueError(f"Unknown model: {mil_name}. Available models: {AVAILABLE_MODELS}")
     
     if mil_name in MIL_DEFAULT_PARAMS:
         return MIL_DEFAULT_PARAMS[mil_name].copy()

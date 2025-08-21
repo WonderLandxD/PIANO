@@ -9,7 +9,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 from torch.utils.data import DataLoader
-from torch.amp import GradScaler
+from torch.cuda.amp import GradScaler
 import torch.optim as optim
 import json
 import scipy.stats as stats
@@ -198,7 +198,7 @@ def train_single_fold(args, fold_idx, device):
     print(f"Creating \033[95m{args.mil_name}\033[0m slide-level finetune method under \033[91m{args.pfm_name}\033[0m...")
     feat_dim = get_model_output_dim(args.pfm_name)
 
-    model = create_mil_model(mil_name=args.mil_name, 
+    model = create_mil_model(model_name=args.mil_name, 
                              dim_in=feat_dim, 
                              num_classes=len(train_dataset.get_classes())
                              ).to(device)

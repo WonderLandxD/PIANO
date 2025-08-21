@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from torch.utils.data import DataLoader
-from torch.amp import GradScaler
+from torch.cuda.amp import GradScaler
 import torch.optim as optim
 
 from piano.model.patch_encoder import create_patch_encoder

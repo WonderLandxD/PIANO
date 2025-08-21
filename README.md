@@ -37,9 +37,22 @@ git clone https://github.com/WonderLandxD/PIANO.git
 cd PIANO
 ```
 
-Next, create a conda env and install the library in editable mode. We directly use the newly created conda environment from the [opensdpc](https://github.com/WonderLandxD/opensdpc/tree/main) library:
+Next, create a conda env and install the library in editable mode. You can directly use the newly created conda environment from 
+the [opensdpc](https://github.com/WonderLandxD/opensdpc/tree/main) library, or create a new conda env and install the dependencies:
 ```
+# Create a new conda env
+conda create -n piano python=3.10 -y
+
+# Activate the conda env
 conda activate piano
+
+# Install PyTorch with CUDA (11.8) support, which has already been in the requirements.txt file
+# pip install torch==2.0.1 torchvision==0.15.2 torchaudio==2.0.2 --index-url https://download.pytorch.org/whl/cu118
+
+# Install all dependencies (including causal-conv1d==1.1.1 for mamba)
+pip install -r requirements.txt
+
+# Install PIANO in editable mode
 pip install -e .
 ```
 

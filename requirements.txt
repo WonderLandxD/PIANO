@@ -1,0 +1,36 @@
+# Core PyTorch packages
+torch==2.0.1
+torchvision==0.15.2
+torchaudio==2.0.2
+
+# Core dependencies
+transformers
+timm
+einops
+sentencepiece
+fairscale
+open_clip_torch
+nystrom-attention
+torch_geometric
+thop
+huggingface_hub
+scikit-image
+causal-conv1d==1.1.1
+
+# Scientific computing
+numpy
+pandas
+matplotlib
+seaborn
+scipy
+scikit-learn
+opencv-python
+Pillow
+h5py
+tqdm
+PyYAML
+
+# Optional WSI processing (recommended)
+openslide-python
+# opensdpc  # Optional, for better WSI processing
+# pyvips    # Optional, alternative WSI processing

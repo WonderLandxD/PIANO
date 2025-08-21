@@ -9,7 +9,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 from torch.utils.data import DataLoader
-from torch.amp import GradScaler
+from torch.cuda.amp import GradScaler
 import torch.optim as optim
 import json
 import scipy.stats as stats
