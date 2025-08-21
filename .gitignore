@@ -56,3 +56,6 @@ datasets/
 RESULTS/
 
 experiments/
+
+# Exclude ProTEA
+model/slide_encoder/protea/
