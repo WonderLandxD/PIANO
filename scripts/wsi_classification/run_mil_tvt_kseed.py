@@ -318,7 +318,7 @@ def test_single_seed(args, seed, device, model_path, exp_dir):
     # Load model
     print(f"Loading best model for testing...")
     feat_dim = get_model_output_dim(args.pfm_name)
-    model = create_mil_model(mil_name=args.mil_name, 
+    model = create_mil_model(model_name=args.mil_name, 
                              dim_in=feat_dim, 
                              num_classes=num_classes
                              ).to(device)
