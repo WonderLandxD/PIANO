@@ -38,9 +38,12 @@ class BClassifier(nn.Module):
             self.q = nn.Sequential(nn.Linear(input_size, 128), nn.ReLU(), nn.Linear(128, 128), nn.Tanh())
         else:
             self.q = nn.Linear(input_size, 128)
-        
+        self.output_class = output_class
         ### 1D convolutional layer that can handle multiple class (including binary)
-        self.fcc = nn.Conv1d(output_class, output_class, kernel_size=input_size)
+        if output_class == 0:
+            self.fcc = nn.Conv1d(input_size, input_size, kernel_size=input_size)
+        else:
+            self.fcc = nn.Conv1d(output_class, output_class, kernel_size=input_size)
         
     def forward(self, feats, c): # N x K, N x C
         device = feats.device
@@ -56,6 +59,7 @@ class BClassifier(nn.Module):
         B = torch.mm(A.transpose(0, 1), V) # compute bag representation, B in shape C x V
                 
         B = B.view(1, B.shape[0], B.shape[1]) # 1 x C x V
+
         C = self.fcc(B) # 1 x C x 1
         C = C.view(1, -1)
         return C, A, B 
@@ -78,10 +82,42 @@ class DSMIL(nn.Module):
         self.b_classifier = BClassifier(dim_in, num_classes, nonlinear=nonlinear)
 
     def forward(self, input_dict, return_loss=True):
-        x = input_dict['features'].squeeze(0)
-        feats, classes = self.i_classifier(x)
-        prediction_bag, A, B = self.b_classifier(feats, classes)
-
+        # Handle batch processing - iterate over batch dimension
+        if isinstance(input_dict, dict):
+            if 'features' in input_dict:
+                x = input_dict['features']
+            elif 'feature' in input_dict:
+                x = input_dict['feature']
+            else:
+                raise KeyError("Input dict must contain 'features' or 'feature' key")
+            label = input_dict.get('labels', None)
+        else:
+            # Backward compatibility
+            x = input_dict
+            label = None
+        
+        # Handle batch processing - iterate over batch dimension
+        batch_size = x.shape[0]
+        all_logits = []
+        all_attn = []
+        all_features = []
+        
+        for i in range(batch_size):
+            # Process each sample in the batch
+            x_sample = x[i].squeeze(0)  # Remove batch dimension for processing
+            
+            feats, classes = self.i_classifier(x_sample)
+            prediction_bag, A, B = self.b_classifier(feats, classes)
+            
+            all_logits.append(prediction_bag)
+            all_attn.append(A)
+            all_features.append(B)
+        
+        # Concatenate results from all samples
+        prediction_bag = torch.cat(all_logits, dim=0)
+        A = torch.cat(all_attn, dim=0) if all_attn else None
+        B = torch.cat(all_features, dim=0) if all_features else None
+        
         # Initialize output dictionary
         output_dict = {
             'logits': prediction_bag,

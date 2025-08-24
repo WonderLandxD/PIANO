@@ -24,9 +24,9 @@ def initialize_weights(module):
 
 
 class MambaMIL(nn.Module):
-    def __init__(self, dim_in, num_classes, dropout, act='gelu', survival=False, layer=2, rate=10, type="SRMamba"):
+    def __init__(self, dim_in, dim_hidden, num_classes, dropout, act='gelu', survival=False, layer=2, rate=10, type="SRMamba"):
         super(MambaMIL, self).__init__()
-        self._fc1 = [nn.Linear(dim_in, 512)]
+        self._fc1 = [nn.Linear(dim_in, dim_hidden)]
         if act.lower() == 'relu':
             self._fc1 += [nn.ReLU()]
         elif act.lower() == 'gelu':
@@ -35,7 +35,7 @@ class MambaMIL(nn.Module):
             self._fc1 += [nn.Dropout(dropout)]
 
         self._fc1 = nn.Sequential(*self._fc1)
-        self.norm = nn.LayerNorm(512)
+        self.norm = nn.LayerNorm(dim_hidden)
         self.layers = nn.ModuleList()
         self.survival = survival
 
@@ -43,9 +43,9 @@ class MambaMIL(nn.Module):
             for _ in range(layer):
                 self.layers.append(
                     nn.Sequential(
-                        nn.LayerNorm(512),
+                        nn.LayerNorm(dim_hidden),
                         SRMamba(
-                            d_model=512,
+                            d_model=dim_hidden,
                             d_state=16,  
                             d_conv=4,    
                             expand=2,
@@ -56,9 +56,9 @@ class MambaMIL(nn.Module):
             for _ in range(layer):
                 self.layers.append(
                     nn.Sequential(
-                        nn.LayerNorm(512),
+                        nn.LayerNorm(dim_hidden),
                         Mamba(
-                            d_model=512,
+                            d_model=dim_hidden,
                             d_state=16,  
                             d_conv=4,    
                             expand=2,
@@ -69,9 +69,9 @@ class MambaMIL(nn.Module):
             for _ in range(layer):
                 self.layers.append(
                     nn.Sequential(
-                        nn.LayerNorm(512),
+                        nn.LayerNorm(dim_hidden),
                         BiMamba(
-                            d_model=512,
+                            d_model=dim_hidden,
                             d_state=16,  
                             d_conv=4,    
                             expand=2,
@@ -86,9 +86,9 @@ class MambaMIL(nn.Module):
         if num_classes == 0:
             self.classifier = nn.Identity()
         else:
-            self.classifier = nn.Linear(512, self.num_classes)
+            self.classifier = nn.Linear(dim_hidden, self.num_classes)
         self.attention = nn.Sequential(
-            nn.Linear(512, 128),
+            nn.Linear(dim_hidden, 128),
             nn.Tanh(),
             nn.Linear(128, 1)
         )

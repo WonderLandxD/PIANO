@@ -187,42 +187,53 @@ class DGRMIL(nn.Module):
             x = input_dict
             label = None
         
-        # Add batch dimension if needed
-        if len(x.shape) == 2:
-            x = x.unsqueeze(0)  # N x dim_in -> 1 x N x dim_in
+        # Handle batch processing - iterate over batch dimension
+        batch_size = x.shape[0]
+        all_logits = []
+        all_attn = []
+        all_features = []
         
-        forward_return = {}
-        x = self.triple_optimizer(x,mode='instances')
-
-        H = self.encoder_instances(x)
-
-        lesion_enhacing = self.triple_optimizer(self.lesionRrepresentation,mode='global')
-
-        #x = self.triple_optimizer(x)
-        #H = self.encoder_instances(x)
-        #lesion_enhacing = self.triple_optimizer(self.lesionRrepresentation)
-
-        lesion_token =  torch.cat((self.token,lesion_enhacing), dim=1)
-
-        lesion = self.encoder_globalLesion(lesion_token)
-                                
+        for i in range(batch_size):
+            # Process each sample in the batch
+            x_sample = x[i:i+1]  # Keep batch dimension
+            
+            # Add batch dimension if needed
+            if len(x_sample.shape) == 2:
+                x_sample = x_sample.unsqueeze(0)  # N x dim_in -> 1 x N x dim_in
+            
+            x_sample = self.triple_optimizer(x_sample, mode='instances')
+            H = self.encoder_instances(x_sample)
+            
+            lesion_enhacing = self.triple_optimizer(self.lesionRrepresentation, mode='global')
+            lesion_token = torch.cat((self.token, lesion_enhacing), dim=1)
+            lesion = self.encoder_globalLesion(lesion_token)
+            
+            out, A = self.crossattention(lesion, H, H)  # 1 x n x L -> 1 x 5 x n 
+            out = self.crossffn(out)
+            out = out[:, 0, :]
+            
+            # Classification
+            logits = self.fc(out)
+            if len(logits.shape) == 1:
+                logits = logits.unsqueeze(0)  # Ensure batch dimension
+            
+            all_logits.append(logits)
+            
+            if return_WSI_attn:
+                WSI_attn = A[:, 0, :].transpose(0, 1)
+                all_attn.append(WSI_attn)
+            if return_WSI_feature:
+                all_features.append(out)
         
-
-        out,A = self.crossattention(lesion,H,H) # 1 x n x L -> 1 x 5 x n 
-        out = self.crossffn(out)
-        out = out[:,0,:]
+        # Concatenate results from all samples
+        logits = torch.cat(all_logits, dim=0)
+        
+        forward_return = {'logits': logits}
+        
         if return_WSI_attn:
-            WSI_attn = A[:,0,:].transpose(0,1)
-            print(WSI_attn.shape)
-            forward_return['WSI_attn'] = WSI_attn
+            forward_return['WSI_attn'] = torch.cat(all_attn, dim=0) if all_attn else None
         if return_WSI_feature:
-            forward_return['WSI_feature'] = out
-        
-        # Classification
-        logits = self.fc(out)
-        if len(logits.shape) == 1:
-            logits = logits.unsqueeze(0)  # Ensure batch dimension
-        forward_return['logits'] = logits
+            forward_return['WSI_feature'] = torch.cat(all_features, dim=0) if all_features else None
         
         # survival analysis
         if self.survival:
@@ -248,26 +259,25 @@ class DGRMIL(nn.Module):
                 loss = self.loss_fn(logits, label)
         forward_return['loss'] = loss
         
-        # print(cls.shape)
+        # Training mode specific operations
         if self.training:
             with torch.no_grad(): 
-                if bag_mode == 'normal': 
-                    x = x.squeeze(0)  
-                    negative_instances = torch.mean(x,dim=0,keepdim=True)
-                    self._momentum_update_nc(negative_instances)
-
-                else:
-                    x = x.squeeze(0)  
-                    postive_instances = torch.mean(x,dim=0,keepdim=True)
-                    self._momentum_update_p(postive_instances)
-            forward_return['A'] = A
-            forward_return['H'] = H
-            forward_return['postivecenter'] = self.postivecenter
-            forward_return['normalcenter'] = self.normalcenter
-            forward_return['lesion_enhacing'] = lesion_enhacing
-            return forward_return
-        else: 
-            return forward_return
+                # Process all samples for momentum updates
+                for i in range(batch_size):
+                    x_sample = x[i:i+1]
+                    if len(x_sample.shape) == 2:
+                        x_sample = x_sample.unsqueeze(0)
+                    
+                    x_sample = self.triple_optimizer(x_sample, mode='instances')
+                    
+                    if bag_mode == 'normal': 
+                        negative_instances = torch.mean(x_sample.squeeze(0), dim=0, keepdim=True)
+                        self._momentum_update_nc(negative_instances)
+                    else:
+                        postive_instances = torch.mean(x_sample.squeeze(0), dim=0, keepdim=True)
+                        self._momentum_update_p(postive_instances)
+        
+        return forward_return
 
     
     @torch.no_grad()

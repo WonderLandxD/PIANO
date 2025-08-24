@@ -153,9 +153,10 @@ class WiKG(nn.Module):
 
         # Apply dropout
         h = self.message_dropout(embedding)
-
         # Global readout/pooling
         h = self.readout(h.squeeze(0), batch=None)
+        h = h.squeeze(1)
+
         h = self.norm(h)
         
         # Classification
