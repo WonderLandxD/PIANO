@@ -73,7 +73,8 @@ def train_wsi(model, train_loader, optimizer, scaler, device, epoch, use_amp=Fal
     Returns:
         float: Average training loss
     """
-    train_loader = tqdm(train_loader, ncols=100, colour='red', desc=f'Epoch {epoch}')
+    train_loader = tqdm(train_loader, ncols=80, leave=False,
+                       desc=f'🎹 Train E{epoch:02d} ({model.training_mode})')
     total_loss = torch.zeros(1).to('cpu')
     
     model.train()
@@ -102,9 +103,13 @@ def train_wsi(model, train_loader, optimizer, scaler, device, epoch, use_amp=Fal
             optimizer.step()
 
         total_loss = (total_loss * i + loss.detach().cpu()) / (i + 1)
-    
-        train_loader.set_description(f'🎹 Train (\033[95m{model.training_mode}\033[0m) | Epoch {epoch} | \033[93mloss: {round(total_loss.item(), 3)}\033[0m')
+        
+        # Update progress bar with current loss
+        train_loader.set_postfix(loss=f'{total_loss.item():.3f}')
 
+    # Update training display line with simple refreshable print
+    print(f'\r🎹 Train E{epoch:02d} ({model.training_mode}) - Loss: {total_loss.item():.3f}', end='', flush=True)
+    
     return total_loss.item()
 
 
@@ -123,7 +128,8 @@ def predict_wsi(model, test_loader, device, epoch):
     """
     labels = torch.tensor([], device='cpu')
     preds = torch.tensor([], device='cpu')
-    test_loader = tqdm(test_loader, ncols=100, colour='blue', desc=f'🎯 Epoch {epoch} | \033[94mPredicting\033[0m')
+    test_loader = tqdm(test_loader, ncols=80, leave=False,
+                      desc=f'🎯 Eval E{epoch:02d}')
     total_loss = torch.zeros(1).to('cpu')
     
     model.eval()
@@ -139,7 +145,13 @@ def predict_wsi(model, test_loader, device, epoch):
             total_loss = (total_loss * i + loss.detach().cpu()) / (i + 1)
             labels = torch.cat([labels, batch['labels'].detach().cpu()], dim=0)
             preds = torch.cat([preds, out_dicts['logits'].detach().cpu()], dim=0)
+            
+            # Update progress bar with current loss
+            test_loader.set_postfix(loss=f'{total_loss.item():.3f}')
 
+    # Update validation display line with simple refreshable print
+    print(f'\r🎯 Eval E{epoch:02d} - Loss: {total_loss.item():.3f}', end='', flush=True)
+    
     return preds.cpu(), labels.cpu(), total_loss.item()
 
 
@@ -156,7 +168,8 @@ def predict_wsi_surv(model, test_loader, device, epoch):
     Returns:
         tuple: (all_censorships, all_event_times, all_risk_scores, total_loss)
     """
-    test_loader = tqdm(test_loader, ncols=100, colour='blue', desc=f'🎯 Epoch {epoch} | \033[94mSurvival Predicting\033[0m')
+    test_loader = tqdm(test_loader, ncols=80, leave=False,
+                      desc=f'🩺 Surv E{epoch:02d}')
     total_loss = torch.zeros(1).to('cpu')
     
     all_risk_scores = np.zeros((len(test_loader)))
@@ -183,7 +196,13 @@ def predict_wsi_surv(model, test_loader, device, epoch):
             all_risk_scores[i] = risk
             all_censorships[i] = batch['events'].item()
             all_event_times[i] = batch['survival_days'].item()
+            
+            # Update progress bar with current loss
+            test_loader.set_postfix(loss=f'{total_loss.item():.3f}')
 
+    # Update validation display line with simple refreshable print
+    print(f'\r🩺 Surv E{epoch:02d} - Loss: {total_loss.item():.3f}', end='', flush=True)
+    
     return all_censorships, all_event_times, all_risk_scores, total_loss.item()
 
 

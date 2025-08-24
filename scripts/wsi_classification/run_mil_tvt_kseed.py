@@ -235,10 +235,6 @@ def train_single_seed(args, seed, device):
         }
         pd.DataFrame([log_data]).to_csv(log_file, mode='a', header=False, index=False, sep='\t', float_format='%.6f')
         
-        # Print metrics
-        print(f"\033[96mSeed {seed} Epoch {epoch} | Train Loss: {train_loss:.4f} | Val Loss: {val_loss:.4f} | "
-              f"Val {args.save_metric}: {val_metrics[args.save_metric]:.4f}\033[0m")
-        
         # Check for improvement and early stopping
         current_metric = val_metrics[args.save_metric]
         if current_metric > best_metric:
@@ -253,15 +249,18 @@ def train_single_seed(args, seed, device):
             save_name = f"best_{args.save_metric}_{args.pfm_name}.pth"
             best_model_path = os.path.join(exp_dir, save_name)
             torch.save(checkpoint, best_model_path)
-            # Display the message in dark green using ANSI escape codes
-            print(f"\033[32mSeed {seed}: Saved best model, validation {args.save_metric}: {best_metric:.4f}\033[0m")
+            
+            # Update status with simple refreshable print
+            print(f'\r✅ Seed {seed}: Saved best model, val {args.save_metric}: {best_metric:.4f}', end='', flush=True)
         else:
             epochs_without_improvement += 1
-            print(f"Seed {seed}: No improvement for {epochs_without_improvement} epochs")
+            # Update status with simple refreshable print
+            print(f'\r⏳ Seed {seed}: No improvement for {epochs_without_improvement} epochs', end='', flush=True)
             
             # Early stopping check
             if epochs_without_improvement >= args.early_stopping:
-                print(f"\033[33mSeed {seed}: Early stopping triggered after {epoch+1} epochs (no improvement for {args.early_stopping} epochs)\033[0m")
+                # Update status and add newline for early stopping
+                print(f'\r🛑 Seed {seed}: Early stopping after {epoch+1} epochs')
                 break
         
         # Save intermediate checkpoint every N epochs
@@ -270,8 +269,9 @@ def train_single_seed(args, seed, device):
             save_name = f"{args.pfm_name}_epoch{epoch+1}.pth"
             save_path = os.path.join(exp_dir, save_name)
             torch.save(checkpoint, save_path)
-            # Display the message in dark blue using ANSI escape codes
-            print(f"\033[34mSeed {seed}: Saved intermediate checkpoint: {save_name}\033[0m")
+            
+            # Update status with simple refreshable print
+            print(f'\r💾 Seed {seed}: Saved checkpoint: {save_name}', end='', flush=True)
     
     # After training, save validation confusion matrix and predictions
     pred_classes = torch.argmax(best_val_logits, dim=1)
@@ -284,7 +284,8 @@ def train_single_seed(args, seed, device):
     # Save validation predictions
     save_predictions(best_val_logits, best_val_labels, val_dataset, exp_dir, 'val_predictions')
     
-    print(f"Seed {seed} training completed. Best validation {args.save_metric}: {best_metric:.4f}")
+    # Print completion with newline
+    print(f"\nSeed {seed} training completed. Best validation {args.save_metric}: {best_metric:.4f}")
     
     # Now run test inference
     print(f"\n=== Testing Seed {seed} ===")

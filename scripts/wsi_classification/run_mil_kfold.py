@@ -244,10 +244,6 @@ def train_single_fold(args, fold_idx, device):
         }
         pd.DataFrame([log_data]).to_csv(log_file, mode='a', header=False, index=False, sep='\t', float_format='%.6f')
         
-        # Print metrics
-        print(f"\033[96mFold {fold_idx} Epoch {epoch} | Train Loss: {train_loss:.4f} | Val Loss: {val_loss:.4f} | "
-              f"Val {args.save_metric}: {val_metrics[args.save_metric]:.4f}\033[0m")
-        
         # Check for improvement and early stopping
         current_metric = val_metrics[args.save_metric]
         if current_metric > best_metric:
@@ -262,15 +258,18 @@ def train_single_fold(args, fold_idx, device):
             save_name = f"best_{args.save_metric}_{args.pfm_name}.pth"
             save_path = os.path.join(exp_dir, save_name)
             torch.save(checkpoint, save_path)
-            # Display the message in dark green using ANSI escape codes
-            print(f"\033[32mFold {fold_idx}: Saved best model, validation {args.save_metric}: {best_metric:.4f}\033[0m")
+            
+            # Update status with simple refreshable print
+            print(f'\r✅ Fold {fold_idx}: Saved best model, val {args.save_metric}: {best_metric:.4f}', end='', flush=True)
         else:
             epochs_without_improvement += 1
-            print(f"Fold {fold_idx}: No improvement for {epochs_without_improvement} epochs")
+            # Update status with simple refreshable print
+            print(f'\r⏳ Fold {fold_idx}: No improvement for {epochs_without_improvement} epochs', end='', flush=True)
             
             # Early stopping check
             if epochs_without_improvement >= args.early_stopping:
-                print(f"\033[33mFold {fold_idx}: Early stopping triggered after {epoch+1} epochs (no improvement for {args.early_stopping} epochs)\033[0m")
+                # Update status and add newline for early stopping
+                print(f'\r🛑 Fold {fold_idx}: Early stopping after {epoch+1} epochs')
                 break
         
         # Save intermediate checkpoint every N epochs
@@ -279,8 +278,9 @@ def train_single_fold(args, fold_idx, device):
             save_name = f"{args.pfm_name}_epoch{epoch+1}.pth"
             save_path = os.path.join(exp_dir, save_name)
             torch.save(checkpoint, save_path)
-            # Display the message in dark blue using ANSI escape codes
-            print(f"\033[34mFold {fold_idx}: Saved intermediate checkpoint: {save_name}\033[0m")
+            
+            # Update status with simple refreshable print
+            print(f'\r💾 Fold {fold_idx}: Saved checkpoint: {save_name}', end='', flush=True)
     
     # After training, save confusion matrix and predictions for best model
     pred_classes = torch.argmax(best_val_logits, dim=1)
@@ -293,7 +293,8 @@ def train_single_fold(args, fold_idx, device):
     # Save detailed predictions
     save_predictions(best_val_logits, best_val_labels, val_dataset, exp_dir)
     
-    print(f"Fold {fold_idx} completed. Best {args.save_metric}: {best_metric:.4f}")
+    # Print completion with newline
+    print(f"\nFold {fold_idx} completed. Best {args.save_metric}: {best_metric:.4f}")
     return best_val_metrics
 
 def save_kfold_summary(args, all_fold_metrics, main_exp_dir):

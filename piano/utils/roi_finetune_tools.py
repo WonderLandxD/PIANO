@@ -60,7 +60,8 @@ def train_roi(model, train_loader, optimizer, scaler, device, epoch, use_amp=Fal
     Returns:
         float: Average training loss
     """
-    train_loader = tqdm(train_loader, ncols=100, colour='red', desc=f'Epoch {epoch}')
+    train_loader = tqdm(train_loader, ncols=80, leave=False, 
+                       desc=f'🔥 Train E{epoch:02d} ({model.training_mode})')
     criterion = nn.CrossEntropyLoss()
     total_loss = torch.zeros(1).to('cpu')
     
@@ -87,8 +88,12 @@ def train_roi(model, train_loader, optimizer, scaler, device, epoch, use_amp=Fal
             optimizer.step()
 
         total_loss = (total_loss * i + loss.detach().cpu()) / (i + 1)
+        
+        # Update progress bar with current loss
+        train_loader.set_postfix(loss=f'{total_loss.item():.3f}')
     
-        train_loader.set_description(f'Train (mode: {model.training_mode}) | Epoch {epoch} | loss: {round(total_loss.item(), 3)}')
+    # Update training display line with simple refreshable print
+    print(f'\r🔥 Train E{epoch:02d} ({model.training_mode}) - Loss: {total_loss.item():.3f}', end='', flush=True)
     
     return total_loss.item()
 
@@ -110,7 +115,8 @@ def predict_roi(model, test_loader, device, epoch):
     """
     labels = torch.tensor([], device='cpu')
     preds = torch.tensor([], device='cpu')
-    test_loader = tqdm(test_loader, ncols=100, colour='blue', desc=f'Epoch {epoch} | Predicting')
+    test_loader = tqdm(test_loader, ncols=80, leave=False,
+                      desc=f'🎯 Eval E{epoch:02d}')
     criterion = nn.CrossEntropyLoss()
     total_loss = torch.zeros(1).to('cpu')
     
@@ -127,7 +133,13 @@ def predict_roi(model, test_loader, device, epoch):
             total_loss = (total_loss * i + loss.detach().cpu()) / (i + 1)
             labels = torch.cat([labels, label.detach().cpu()], dim=0)
             preds = torch.cat([preds, logits.detach().cpu()], dim=0)
+            
+            # Update progress bar with current loss
+            test_loader.set_postfix(loss=f'{total_loss.item():.3f}')
 
+    # Update validation display line with simple refreshable print
+    print(f'\r🎯 Eval E{epoch:02d} - Loss: {total_loss.item():.3f}', end='', flush=True)
+    
     return preds.cpu(), labels.cpu(), total_loss.item()
 
 
