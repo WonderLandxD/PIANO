@@ -1,4 +1,6 @@
 # This code is taken from the original S4 repository https://github.com/HazyResearch/state-spaces
+import warnings
+warnings.filterwarnings("ignore")
 import math
 import torch
 import torch.nn as nn
