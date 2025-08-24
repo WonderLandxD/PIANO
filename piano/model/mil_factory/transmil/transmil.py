@@ -69,7 +69,11 @@ class TransMIL(nn.Module):
         self.layer1 = TransLayer(dim=self.dim_hidden)
         self.layer2 = TransLayer(dim=self.dim_hidden)
         self.norm = nn.LayerNorm(self.dim_hidden)
-        self._fc2 = nn.Linear(self.dim_hidden, num_classes)
+        # Handle the case when num_classes=0 (no classification head)
+        if num_classes == 0:
+            self._fc2 = nn.Identity()
+        else:
+            self._fc2 = nn.Linear(self.dim_hidden, num_classes)
 
     def forward(self, input_dict, return_loss=True):
 

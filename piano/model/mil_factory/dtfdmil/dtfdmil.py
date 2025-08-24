@@ -8,7 +8,11 @@ from piano.utils.wsi_finetune_tools import NLLSurvLoss
 class Classifier_1fc(nn.Module):
     def __init__(self, n_channels, n_classes, droprate=0.0):
         super(Classifier_1fc, self).__init__()
-        self.fc = nn.Linear(n_channels, n_classes)
+        # Handle the case when n_classes=0 (no classification head)
+        if n_classes == 0:
+            self.fc = nn.Identity()
+        else:
+            self.fc = nn.Linear(n_channels, n_classes)
         self.droprate = droprate
         if self.droprate != 0.0:
             self.dropout = torch.nn.Dropout(p=self.droprate)

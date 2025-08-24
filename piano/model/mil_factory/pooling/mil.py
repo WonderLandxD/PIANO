@@ -16,7 +16,11 @@ class MeanPool(nn.Module):
         else:
             self.loss_fn = nn.CrossEntropyLoss()
 
-        self.fc = nn.Linear(dim_in, num_classes)
+        # Handle the case when num_classes=0 (no classification head)
+        if num_classes == 0:
+            self.fc = nn.Identity()
+        else:
+            self.fc = nn.Linear(dim_in, num_classes)
 
     def forward(self, input_dict, return_loss=True):
         x = input_dict['features']
@@ -71,7 +75,11 @@ class MaxPool(nn.Module):
         else:
             self.loss_fn = nn.CrossEntropyLoss()
 
-        self.fc = nn.Linear(dim_in, num_classes)
+        # Handle the case when num_classes=0 (no classification head)
+        if num_classes == 0:
+            self.fc = nn.Identity()
+        else:
+            self.fc = nn.Linear(dim_in, num_classes)
 
     def forward(self, input_dict, return_loss=True):
         x = input_dict['features']

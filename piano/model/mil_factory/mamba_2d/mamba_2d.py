@@ -61,7 +61,11 @@ class MambaMIL_2D(nn.Module):
                 nn.Tanh(),
                 nn.Linear(128, 1)
             )
-        self.classifier = nn.Linear(128, self.n_classes)
+        # Handle the case when num_classes=0 (no classification head)
+        if num_classes == 0:
+            self.classifier = nn.Identity()
+        else:
+            self.classifier = nn.Linear(128, self.n_classes)
 
         self.pos_emb_type = pos_emb_type
         if pos_emb_type == 'linear':

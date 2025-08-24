@@ -61,7 +61,11 @@ class WiKG(nn.Module):
 
         # Normalization and classification
         self.norm = nn.LayerNorm(self.dim_hidden)
-        self.classifier = nn.Linear(self.dim_hidden, num_classes)
+        # Handle the case when num_classes=0 (no classification head)
+        if num_classes == 0:
+            self.classifier = nn.Identity()
+        else:
+            self.classifier = nn.Linear(self.dim_hidden, num_classes)
 
         # Readout/pooling layer
         if pool == "mean":

@@ -24,7 +24,11 @@ class M4(nn.Module):
         self.gate1_fc1 = nn.Sequential(nn.Linear(self.feat_input, 512), nn.ReLU())
         self.gate1_fc2 = nn.ModuleList([nn.Sequential(nn.Linear(128, self.num_expert), nn.Softmax(dim=-1)) for i in range(self.tasks)])
 
-        self.classifier = nn.Linear(self.experts_out, num_classes)
+        # Handle the case when num_classes=0 (no classification head)
+        if num_classes == 0:
+            self.classifier = nn.Identity()
+        else:
+            self.classifier = nn.Linear(self.experts_out, num_classes)
 
         # tower
         # self.towers = nn.ModuleList(

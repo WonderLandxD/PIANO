@@ -21,7 +21,11 @@ class ABMIL(nn.Module):
             nn.Dropout(dropout),
             nn.Linear(self.dim_hidden, 1)
         )
-        self.fc = nn.Linear(dim_in, num_classes)
+        # Handle the case when num_classes=0 (no classification head)
+        if num_classes == 0:
+            self.fc = nn.Identity()
+        else:
+            self.fc = nn.Linear(dim_in, num_classes)
 
         # Automatically select loss function based on survival or classification
         if self.survival:
@@ -97,7 +101,11 @@ class GatedABMIL(nn.Module):
 
         self.attn_3 = nn.Linear(self.dim_hidden, 1)
 
-        self.fc = nn.Linear(dim_in, num_classes)
+        # Handle the case when num_classes=0 (no classification head)
+        if num_classes == 0:
+            self.fc = nn.Identity()
+        else:
+            self.fc = nn.Linear(dim_in, num_classes)
 
         # Automatically select loss function based on survival or classification
         if self.survival:

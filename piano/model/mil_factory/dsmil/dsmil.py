@@ -9,7 +9,11 @@ from piano.utils.wsi_finetune_tools import NLLSurvLoss
 class FCLayer(nn.Module):
     def __init__(self, in_size, out_size=1):
         super().__init__()
-        self.fc = nn.Sequential(nn.Linear(in_size, out_size))
+        # Handle the case when out_size=0 (no classification head)
+        if out_size == 0:
+            self.fc = nn.Sequential(nn.Identity())
+        else:
+            self.fc = nn.Sequential(nn.Linear(in_size, out_size))
     def forward(self, feats):
         x = self.fc(feats)
         return feats, x

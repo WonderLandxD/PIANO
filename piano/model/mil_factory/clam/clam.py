@@ -100,9 +100,17 @@ class CLAM_SB(nn.Module):
             n_classes=1
         )
         
-        self.classifier = nn.Linear(self.dim_hidden_1, num_classes)
+        # Handle the case when num_classes=0 (no classification head)
+        if num_classes == 0:
+            self.classifier = nn.Identity()
+        else:
+            self.classifier = nn.Linear(self.dim_hidden_1, num_classes)
         
-        instance_classifiers = [nn.Linear(self.dim_hidden_1, 2) for _ in range(num_classes)]
+        # Handle the case when num_classes=0 (no classification head) for instance classifiers
+        if num_classes == 0:
+            instance_classifiers = [nn.Identity()]
+        else:
+            instance_classifiers = [nn.Linear(self.dim_hidden_1, 2) for _ in range(num_classes)]
         self.instance_classifiers = nn.ModuleList(instance_classifiers)
         
         # Automatically select loss function based on survival or classification
@@ -261,10 +269,14 @@ class CLAM_MB(CLAM_SB):
             n_classes=num_classes
         )
         
-        bag_classifiers = [nn.Linear(self.dim_hidden_1, 1) for _ in range(num_classes)]
+        # Handle the case when num_classes=0 (no classification head)
+        if num_classes == 0:
+            bag_classifiers = [nn.Identity()]
+            instance_classifiers = [nn.Identity()]
+        else:
+            bag_classifiers = [nn.Linear(self.dim_hidden_1, 1) for _ in range(num_classes)]
+            instance_classifiers = [nn.Linear(self.dim_hidden_1, 2) for _ in range(num_classes)]
         self.classifiers = nn.ModuleList(bag_classifiers)
-        
-        instance_classifiers = [nn.Linear(self.dim_hidden_1, 2) for _ in range(num_classes)]
         self.instance_classifiers = nn.ModuleList(instance_classifiers)
         
         # Automatically select loss function based on survival or classification

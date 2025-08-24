@@ -150,7 +150,11 @@ class AMD_MIL(nn.Module):
         self.norm = nn.LayerNorm(embed_dim)         
         
         # Final classification layer
-        self.fc = nn.Linear(embed_dim, num_classes)
+        # Handle the case when num_classes=0 (no classification head)
+        if num_classes == 0:
+            self.fc = nn.Identity()
+        else:
+            self.fc = nn.Linear(embed_dim, num_classes)
         
         # Loss function selection
         if self.survival:

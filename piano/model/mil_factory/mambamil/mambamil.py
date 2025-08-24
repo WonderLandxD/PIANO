@@ -82,7 +82,11 @@ class MambaMIL(nn.Module):
             raise NotImplementedError("Mamba [{}] is not implemented".format(type))
 
         self.num_classes = num_classes
-        self.classifier = nn.Linear(512, self.num_classes)
+        # Handle the case when num_classes=0 (no classification head)
+        if num_classes == 0:
+            self.classifier = nn.Identity()
+        else:
+            self.classifier = nn.Linear(512, self.num_classes)
         self.attention = nn.Sequential(
             nn.Linear(512, 128),
             nn.Tanh(),

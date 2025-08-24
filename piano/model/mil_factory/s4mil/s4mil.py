@@ -171,7 +171,11 @@ class S4MIL(nn.Module):
         self.s4_block = nn.Sequential(nn.LayerNorm(512),
                                       S4D(d_model=512, d_state=32, transposed=False))
 
-        self.classifier = nn.Linear(512, self.num_classes)
+        # Handle the case when num_classes=0 (no classification head)
+        if num_classes == 0:
+            self.classifier = nn.Identity()
+        else:
+            self.classifier = nn.Linear(512, self.num_classes)
             
     def forward(self, input_dict, return_loss=True):
         # Extract features from input dict

@@ -157,9 +157,13 @@ class DGRMIL(nn.Module):
         )
  
         self.crossattention =  CrossLayer(dim=self.L,d=dropout_node)
-        self.fc = nn.Sequential(
-            nn.Linear(self.L,num_classes)
-        )
+        # Handle the case when num_classes=0 (no classification head)
+        if num_classes == 0:
+            self.fc = nn.Sequential(nn.Identity())
+        else:
+            self.fc = nn.Sequential(
+                nn.Linear(self.L,num_classes)
+            )
 
         # 根据任务类型自动选择损失函数
         if self.survival:

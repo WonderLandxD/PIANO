@@ -134,10 +134,17 @@ class ILRAMIL(nn.Module):
         self.pooling = NLP(dim=self.dim_hidden, num_heads=num_heads, ln=ln)
 
         # Classifier with dropout
-        self.classifier = nn.Sequential(
-            nn.Dropout(dropout),
-            nn.Linear(in_features=self.dim_hidden, out_features=num_classes)
-        )
+        # Handle the case when num_classes=0 (no classification head)
+        if num_classes == 0:
+            self.classifier = nn.Sequential(
+                nn.Dropout(dropout),
+                nn.Identity()
+            )
+        else:
+            self.classifier = nn.Sequential(
+                nn.Dropout(dropout),
+                nn.Linear(in_features=self.dim_hidden, out_features=num_classes)
+            )
 
 
         if self.survival:
