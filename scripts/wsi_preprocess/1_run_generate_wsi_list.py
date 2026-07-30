@@ -34,7 +34,7 @@ def main():
     args = parse()
     
     # Find all WSI files
-    wsi_files = find_wsi_files(args.data_folder, args.file_types)
+    wsi_files = find_wsi_files(args.data_folder, args.additional_file_types)
     
     # Create save path
     today = date.today()

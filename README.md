@@ -20,6 +20,8 @@
 
 ## 📰 News
 
+**2026-07-31:** Updated the WSI preprocessing workflow with customizable file-type discovery, MPP-based 20x/40x pyramid-level selection, optional downscaling, configurable JPEG quality, and source-directory structure preservation. Updated the documentation with parameter descriptions and runnable examples.
+
 **2025-05-20:** Added fine-tuning codes for slide-level classification tasks. Optimized some codes and README.md. 
 
 **2025-03-19:** Added fine-tuning codes for patch-level classification tasks. Optimized some codes. 
@@ -214,86 +216,106 @@ We first run the command `scripts/wsi_preprocess/1_run_generate_wsi_list.py` as 
 ```bash
 cd scripts/wsi_preprocess
 
-python 1_run_generate_wsi_list.py --data_folder ROOT_DIRECTORY_PATH_CONTAINING_WSI_FILES --dataset_name DATASET_NAME --save_dir ../WSI_DATA/wsi_list_csv
+python 1_run_generate_wsi_list.py \
+    --data_folder ROOT_DIRECTORY_PATH_CONTAINING_WSI_FILES \
+    --dataset_name DATASET_NAME \
+    --save_dir ../WSI_DATA/wsi_list_csv
 ```
 
-> **--data_folder ROOT_DIRECTORY_PATH_CONTAINING_WSI_FILES** is the path where the script will recursively search for all WSI files with extensions '.svs', '.sdpc', '.tiff', '.tif', '.ndpi'. The script will find all matching files in this directory and its subdirectories. 
+> **--data_folder ROOT_DIRECTORY_PATH_CONTAINING_WSI_FILES** is the root directory in which the script recursively searches for WSI files.
 
 > **--dataset_name DATASET_NAME** is your custom name for the dataset, which will be used in the output CSV filename.
 
-> **--save_dir YOUR_DIRECTORY_TO_SAVE_CSV_FILE** is the directory where the CSV file containing the list of WSI files will be saved. (Default: `../WSI_DATA/wsi_list_csv`)
+> **--save_dir DIRECTORY_TO_SAVE_CSV_FILE** is the directory where the CSV file containing the WSI paths will be saved. The output filename is `{DATASET_NAME}_wsi_{DATE}.csv`.
 
- ```bash
-# You can customize the file types to search for using the `--additional_file_types` parameter. For example, to include `.mrxs` files in addition to the default extensions:
+> **--additional_file_types EXTENSION [EXTENSION ...]** sets the WSI filename extensions to search for. Its default value is `.svs .sdpc .tiff .tif .ndpi`. When this option is provided, it replaces the default list, so include the default extensions explicitly if you still need them.
 
-cd scripts/wsi_preprocess
+For example, the following command searches for the default file types plus `.mrxs`:
 
-python 1_run_generate_wsi_list.py --data_folder ROOT_DIRECTORY_PATH_CONTAINING_WSI_FILES --dataset_name DATASET_NAME --save_dir DIRECTORY_TO_SAVE_CSV_FILE --additional_file_types .mrxs
- ```
+```bash
+python 1_run_generate_wsi_list.py \
+    --data_folder /data/pathology/my_cohort \
+    --dataset_name MY_COHORT \
+    --save_dir ../WSI_DATA/wsi_list_csv \
+    --additional_file_types .svs .sdpc .tiff .tif .ndpi .mrxs
+```
 
 ---
 ***STEP 2 - Generate patches from all WSIs in the CSV file.***
 
-Next, run the command `scripts/wsi_preprocess/2_run_generate_patches.py` as follows. We recommend using **--n_thread 8** (8 processes) since it works on regular CPU:
+Next, run `scripts/wsi_preprocess/2_run_generate_patches.py`. The target magnification is required and the matching pyramid level is selected from the MPP metadata of each WSI. We recommend starting with **--n_thread 8** on a regular CPU:
 
 ```bash
 cd scripts/wsi_preprocess
 
-python 2_run_generate_patches.py --n_thread 8 --csv_path PATH_TO_CSV_FILE --save_dir DIRECTORY_TO_SAVE_PATCHES
+python 2_run_generate_patches.py \
+    --n_thread 8 \
+    --magnification 20x \
+    --csv_path PATH_TO_CSV_FILE \
+    --save_dir DIRECTORY_TO_SAVE_PATCHES \
+    --data_root ROOT_DIRECTORY_PATH_CONTAINING_WSI_FILES
 ```
 
-> **--csv_path PATH_TO_CSV_FILE** is the path to the CSV file containing the list of WSI files. (File from step 1)
+**Input and output parameters:**
 
-> **--save_dir DIRECTORY_TO_SAVE_PATCHES** is the directory where the patches will be saved. The script will create a subdirectory with the same name as the CSV file, and within it, create a directory structure for each slide as follows:
+- **--csv_path PATH_TO_CSV_FILE** (required): path to the CSV file generated in Step 1.
+- **--save_dir DIRECTORY_TO_SAVE_PATCHES** (required): root directory in which the generated patch directories are saved.
+- **--data_root ROOT_DIRECTORY_PATH_CONTAINING_WSI_FILES** (optional): root of the source WSI directory tree. The directory structure below this root is mirrored under `--save_dir`. If omitted, the script infers the deepest common directory from all WSI paths in the CSV. Setting it explicitly is recommended when you want to preserve a specific hierarchy.
+- **--append_csv_name** (optional flag): inserts an additional directory named after the CSV filename (without `.csv`) directly below `--save_dir`. By default, no CSV-name directory is added.
 
-```
-DIRECTORY_TO_SAVE_PATCHES/
-	CSV_FILE_NAME_{DATE}/
-		├── slide_1
-    			├── no000000_{coordinate x_0}x_{coordinate y_0}y.jpg
-    			├── no000001_{coordinate x_1}x_{coordinate y_1}y.jpg
-                ├── ...
-                ├── no00000m_{coordinate x_m}x_{coordinate y_m}y.jpg
-    			└── thumbnail/
-                      └── x20_thumbnail.jpg
-		├──slide_2
-    			├── no000000_{coordinate x_0}x_{coordinate y_0}y.jpg
-    			├── no000001_{coordinate x_1}x_{coordinate y_1}y.jpg
-                ├── ...
-                ├── no00000m_{coordinate x_m}x_{coordinate y_m}y.jpg
-    			└── thumbnail/
-                      └── x20_thumbnail.jpg
-        ...
-		└── slide_N
-    			├── no000000_{coordinate x_0}x_{coordinate y_0}y.jpg
-    			├── no000001_{coordinate x_1}x_{coordinate y_1}y.jpg
-                ├── ...
-                ├── no00000m_{coordinate x_m}x_{coordinate y_m}y.jpg
-    			└── thumbnail/
-                      └── x20_thumbnail.jpg
-└── ...
+**Magnification and patch parameters:**
+
+- **--magnification {20x,40x}** (required): target patch magnification. `20x` corresponds to a nominal MPP of `0.5 µm/px`, while `40x` corresponds to `0.25 µm/px`. The script selects the closest WSI pyramid level using the slide MPP or objective-power metadata. A slide without usable metadata or a matching level is skipped.
+- **--mpp_tolerance FLOAT** (default: `0.15`): maximum relative difference allowed between the MPP of a pyramid level and the target MPP. For example, `0.15` allows a 15% difference.
+- **--allow_downscale** (optional flag): if no pyramid level matches the target within `--mpp_tolerance`, reads from a sufficiently fine level and downsamples it to the requested magnification. Without this flag, that WSI is skipped. This option does not enable upsampling from a coarser level.
+- **--patch_w INT** / **--patch_h INT** (default: `256` / `256`): width and height, in pixels, of each saved patch at the target magnification.
+- **--overlap_w INT** / **--overlap_h INT** (default: `0` / `0`): horizontal and vertical overlap, in output-patch pixels. Each overlap must be smaller than the corresponding patch dimension.
+- **--jpg_quality INT** (default: `40`): JPEG quality of saved patches, from 1 to 100.
+
+**Tissue filtering and execution parameters:**
+
+- **--blank_TH FLOAT** (default: `0.7`): maximum permitted background fraction for retaining a patch. A patch is kept when its estimated blank fraction is lower than this value.
+- **--kernel_size INT** (default: `5`): kernel size used by the morphological closing and opening operations when refining the thumbnail tissue mask.
+- **--thumb_n FLOAT** (default: `1`): selects the thumbnail level relative to the end of the WSI pyramid. The default `1` uses the last (lowest-resolution) level.
+- **--n_thread INT** (default: `16`): number of worker threads used to process WSIs.
+
+For example, suppose the CSV contains:
+
+```text
+/data/pathology/my_cohort/project_A/train/case_001/slide_01.svs
 ```
 
-**Example from the CPTAC Lung cohort:**
+The following command generates 256 × 256 patches at 20x, permits downscaling when an exact pyramid level is unavailable, and keeps the CSV name in the output path:
+
+```bash
+python 2_run_generate_patches.py \
+    --n_thread 8 \
+    --patch_w 256 \
+    --patch_h 256 \
+    --magnification 20x \
+    --mpp_tolerance 0.15 \
+    --allow_downscale \
+    --jpg_quality 90 \
+    --csv_path ../WSI_DATA/wsi_list_csv/MY_COHORT_wsi_2026-07-30.csv \
+    --data_root /data/pathology/my_cohort \
+    --save_dir ../WSI_DATA/patches \
+    --append_csv_name
 ```
-DIRECTORY_TO_SAVE_PATCHES/
-	CPTAC-LUAD_2025-05-19/
-		├── C3L-04365-28
-    			├── no000000_000003072x_000006144y.jpg
-    			├── no000001_000003072x_000009216y.jpg
-    			├── no000002_000006144x_000003072y.jpg
-    			├── no000003_000006144x_000006144y.jpg
-    			├── no000004_000006144x_000009216y.jpg
-    			├── no000005_000009216x_000003072y.jpg
-    			├── no000006_000009216x_000006144y.jpg
-    			├── no000007_000009216x_000009216y.jpg
-    			├── no000008_000012288x_000003072y.jpg
-    			├── no000009_000012288x_000006144y.jpg
-    			├── no000010_000015360x_000006144y.jpg
-    			├── no000011_000018432x_000006144y.jpg
-    			└── thumbnail/
-                      └── x20_thumbnail.jpg
-        └── ...
+
+The output directory mirrors the source hierarchy below `--data_root`. A completed slide is marked by `thumbnail/x20_thumbnail.jpg`; if that file already exists, the slide is skipped on subsequent runs:
+
+```
+../WSI_DATA/patches/
+└── MY_COHORT_wsi_2026-07-30/
+    └── project_A/
+        └── train/
+            └── case_001/
+                └── slide_01/
+                    ├── no000000_{coordinate_x}x_{coordinate_y}y.jpg
+                    ├── no000001_{coordinate_x}x_{coordinate_y}y.jpg
+                    ├── ...
+                    └── thumbnail/
+                        └── x20_thumbnail.jpg
 ```
 
 ---
@@ -488,7 +510,5 @@ python run_wsi_infer.py --test_json PATH_TO_JSON_FILE --model_name FOUNDATION_MO
 
 
 *Jiawen Li, H&G Pathology AI Research Team*
-
-
 
 
